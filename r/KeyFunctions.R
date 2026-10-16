@@ -14,6 +14,10 @@ Var.FromPower <- function(p0,p1,power,alpha=0.05) {(p1-p0)^2/(qnorm(1-alpha/2)-q
 N.star.V <- function(C1,C2,C3,p0,p1,pi_exp,V) {p1*(1-p1)/(pi_exp*V) + sqrt(C3*p0*(1-p0)*p1*(1-p1)/(pi_exp*V^2*(C1+pi_exp*C2+pi_exp*C3)))}
 N.star.B <- function(C1,C2,C3,p0,p1,pi_exp,B) {(B*p1*(1-p1)-sqrt(B^2*C3/(C1+pi_exp*C2+pi_exp*C3)*pi_exp*p0*(1-p0)*p1*(1-p1)))/((C1+pi_exp*C2+pi_exp*C3)*p1*(1-p1)-C3*pi_exp*p0*(1-p0))}
 
+##### Using new notation from latex file:
+N.star.B2 <- function(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, B) {
+  B*(pi_1*(1-pi_1)-sqrt(pi_0*(1-pi_0)*pi_1*(1-pi_1)*C_2*rho_1*pi_e/(C_1+pi_e*C_2+pi_e*C_e)))/((C_1+pi_e*C_2+pi_e*C_e)*pi_1*(1-pi_1)-C_2*rho_1*pi_e*pi_0*(1-pi_0))}
+
 ## Dynamic Optimum-Finding Functions
 CheckSet.P <- function(Starts,
                        Delta,pi_exp,
