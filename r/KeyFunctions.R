@@ -16,51 +16,78 @@ V.N0N <- function(pi_0,pi_1,N_0,N,rho_1,pi_e,rho_2) {
   pi_0*(1-pi_0)*sum(sapply(1:N_0, function(x) 1/x*dbinom(x, N_0, rho_2))) +
     pi_1*(1-pi_1)*sum(sapply(1:N, function(y) 1/y*dbinom(y, N, rho_1*pi_e*rho_2)))
 }
-C.NN0N1 <- function(C_1, C_2, C_e, N, N_0, N_1) {
+C.N0N1N <- function(C_1, C_2, C_e, N_0, N_1, N) {
   N*C_1+(N_0+N_1)*C_2+N_1*C_e
 }
-C.NN0 <- function(C_1, C_2, C_e, N, N_0, rho_1, pi_e) {
-  N*C_1+N_0*C_2+N*rho_1*pi_e*(C_2+C_e)
+C.N0N <- function(C_1, C_2, C_e, N_0, N, rho_1, pi_e, quantile=NULL) {
+  if (is.null(quantile)) {
+    N*C_1+N_0*C_2+N*rho_1*pi_e*(C_2+C_e)
+  } else {
+    N*C_1+N_0*C_2+qbinom(p=quantile, size=N, prob=rho_1*pi_e)*(C_2+C_e)
+  }
 }
 
 ## Approximate Optima Functions
-N.star.V2 <- function(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, rho_2, V) {
+NVtoN0 <- function(pi_0,pi_1,rho_1,pi_e,rho_2,N,V) {
+  (N*rho_1*pi_e*pi_0*(1-pi_0))/(V*N*rho_1*pi_e*rho_2-pi_1*(1-pi_1))
+}
+
+NBtoN0 <- function(rho_1,pi_e,C_1,C_2,C_e,N,B) {
+  (B-N*(C_1+rho_1*pi_e*C_2+rho_1*pi_e*C_e))/C_2
+}
+
+N.star.V <- function(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, rho_2, V) {
   (pi_1*(1-pi_1)+sqrt(C_2*rho_1*pi_e*pi_0*(1-pi_0)*pi_1*(1-pi_1)/(C_1+rho_1*pi_e*C_2+rho_1*pi_e*C_e)))/(V*rho_1*pi_e*rho_2) 
 }
 
-N.star.B2 <- function(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, B) {
+N.star.Delta <- function(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, rho_2, Delta, alpha=0.05) {
+  N.star.V(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, rho_2,
+           DeltaToV(pi_0, pi_1, Delta, alpha))
+}
+
+N.star.B <- function(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, B) {
   B*(pi_1*(1-pi_1)-sqrt(pi_0*(1-pi_0)*pi_1*(1-pi_1)*C_2*rho_1*pi_e/(C_1+rho_1*pi_e*C_2+rho_1*pi_e*C_e)))/((C_1+rho_1*pi_e*C_2+rho_1*pi_e*C_e)*pi_1*(1-pi_1)-C_2*rho_1*pi_e*pi_0*(1-pi_0))
 }
 
 ## Dynamic Optimum-Finding Functions
 CheckSet.P <- function(Starts,
-                       Delta,pi_exp,
-                       p0,p1,
-                       C1,C2,C3,
+                       Delta,
+                       pi_0,pi_1,
+                       rho_1,pi_e,rho_2,
+                       C_1,C_2,C_e,
                        alpha=0.05,
                        NumCheck=20,
                        quantile=NULL) {
   Checks <- cross_join(tibble(N=(Starts$N:(Starts$N+NumCheck))),
                        tibble(N0=(Starts$N0:(Starts$N0+NumCheck))))
-  Checks$Power.E <- apply(Checks, 1, FUN=function(row) Power.E(p0,p1,row["N0"],pi_exp,row["N"],alpha))
+  Checks$Power.E <- apply(Checks, 1, FUN=function(row) VToDelta(pi_0, pi_1,
+                                                                V.N0N(pi_0,pi_1,row["N0"],row["N"],
+                                                                      rho_1,pi_e,rho_2),
+                                                                alpha))
   if (max(Checks$Power.E) >= Delta) {
     Checks <- Checks %>% dplyr::filter(Power.E >= Delta)
-    Checks$B.E <- apply(Checks, 1, FUN=function(row) B.E(C1,C2,C3,row["N0"],pi_exp,row["N"]))
-    if (is.null(quantile)) { # Minimizes mean budget
-      Checks <- Checks %>% dplyr::filter(B.E==min(Checks$B.E))
-    } else {
-      Checks$B.quantile <- apply(Checks, 1, FUN=function(row) B.quant(C1,C2,C3,row["N0"],pi_exp,row["N"],quantile))
-      Checks <- Checks %>% dplyr::filter(B.quantile==min(Checks$B.quantile))
-    }
-    Checks$SD.E <- apply(Checks, 1, FUN=function(row) sqrt(Var.E(p0,p1,row["N0"],pi_exp,row["N"])))
-    Checks$N1.E <- Checks$N*pi_exp
-    Checks$B.75 <- apply(Checks, 1, FUN=function(row) B.quant(C1,C2,C3,row["N0"],pi_exp,row["N"],0.75))
-    Checks$B.90 <- apply(Checks, 1, FUN=function(row) B.quant(C1,C2,C3,row["N0"],pi_exp,row["N"],0.90))
+    Checks$C.val <- apply(Checks, 1, FUN=function(row) 
+      C.N0N(C_1, C_2, C_e, row["N0"], row["N"], rho_1, pi_e, quantile))
+    Checks <- Checks %>% dplyr::filter(C.val==min(Checks$C.val))
+
+    Checks$C.E <- apply(Checks, 1, FUN=function(row) 
+      C.N0N(C_1, C_2, C_e, row["N0"], row["N"], rho_1, pi_e, quantile=NULL))
+    Checks$SD.E <- apply(Checks, 1, 
+                         FUN=function(row) sqrt(V.N0N(pi_0,pi_1,row["N0"],row["N"],rho_1,pi_e,rho_2)))
+    Checks$C.75 <- apply(Checks, 1, FUN=function(row) 
+      C.N0N(C_1, C_2, C_e, row["N0"], row["N"], rho_1, pi_e, quantile=0.75))
+    Checks$C.90 <- apply(Checks, 1, FUN=function(row) 
+      C.N0N(C_1, C_2, C_e, row["N0"], row["N"], rho_1, pi_e, quantile=0.90))
+    
     Checks <- Checks %>%
-      dplyr::mutate(N1=round(N1.E))
-    Checks$B.N1 <- apply(Checks, 1, FUN=function(row) B.N1(C1,C2,C3,row["N0"],row["N1"],row["N"]))
-    Checks$SD.N1 <- apply(Checks, 1, FUN=function(row) sqrt(Var.N1(p0,p1,row["N0"],row["N1"])))
-    Checks$Power.N1 <- apply(Checks, 1, FUN=function(row) Power.N1(p0,p1,row["N0"],row["N1"],alpha))
+      dplyr::mutate(N1.E=N*pi_e,
+                    N1=round(N1.E))
+    Checks$C.N1 <- apply(Checks, 1, FUN=function(row) 
+      C.N0N1N(C_1, C_2, C_e, row["N0"], row["N1"], row["N"]))
+    Checks$SD.N1 <- apply(Checks, 1, FUN=function(row) 
+      sqrt(V.N0N1(pi_0,pi_1,row["N0"],row["N1"],rho_2)))
+    Checks$Power.N1 <- apply(Checks, 1, FUN=function(row) 
+      VToDelta(pi_0, pi_1, row["SD.N1"]^2, alpha))
     return(Checks)
   } else {
     stop("No combination found that meets required power. Try increasing NumCheck.")
@@ -68,26 +95,41 @@ CheckSet.P <- function(Starts,
 }
 
 CheckSet.B <- function(Starts,
-                       B,pi_exp,
-                       p0,p1,
-                       C1,C2,C3,
+                       B,
+                       pi_0,pi_1,
+                       rho_1,pi_e,rho_2,
+                       C_1,C_2,C_e,
                        alpha=0.05,
                        NumCheck=5) {
   Checks <- cross_join(tibble(N=(Starts$N-NumCheck):(Starts$N)),
                        tibble(N0=(Starts$N0-NumCheck):(Starts$N0)))
-  Checks$B.E <- apply(Checks, 1, FUN=function(row) B.E(C1,C2,C3,row["N0"],pi_exp,row["N"]))
-  if (min(Checks$B.E) <= B) {
-    Checks <- Checks %>% dplyr::filter(B.E <= B)
-    Checks$Power.E <- apply(Checks, 1, FUN=function(row) Power.E(p0,p1,row["N0"],pi_exp,row["N"],alpha))
+  Checks$Power.E <- apply(Checks, 1, FUN=function(row) VToDelta(pi_0, pi_1,
+                                                                V.N0N(pi_0,pi_1,row["N0"],row["N"],
+                                                                      rho_1,pi_e,rho_2),
+                                                                alpha))
+  Checks$C.val <- apply(Checks, 1, FUN=function(row) 
+    C.N0N(C_1, C_2, C_e, row["N0"], row["N"], rho_1, pi_e, quantile=NULL))
+  
+  if (min(Checks$C.val) <= B) {
+    Checks <- Checks %>% dplyr::filter(C.val <= B)
     Checks <- Checks %>% dplyr::filter(Power.E==max(Checks$Power.E))
-    Checks$SD.E <- apply(Checks, 1, FUN=function(row) sqrt(Var.E(p0,p1,row["N0"],pi_exp,row["N"])))
-    Checks$N1.E <- Checks$N*pi_exp
-    Checks$B.75 <- apply(Checks, 1, FUN=function(row) B.quant(C1,C2,C3,row["N0"],pi_exp,row["N"],quantile=0.75))
-    Checks$B.90 <- apply(Checks, 1, FUN=function(row) B.quant(C1,C2,C3,row["N0"],pi_exp,row["N"],quantile=0.90))
-    ComboBest$N1 <- round(ComboBest$N1.E)
-    ComboBest$B.N1 <- apply(ComboBest, 1, FUN=function(row) B.N1(C1,C2,C3,row["N0"],row["N1"],row["N"]))
-    ComboBest$SD.N1 <- apply(ComboBest, 1, FUN=function(row) sqrt(Var.N1(p0,p1,row["N0"],row["N1"])))
-    ComboBest$Power.N1 <- apply(ComboBest, 1, FUN=function(row) Power.N1(p0,p1,row["N0"],row["N1"],alpha))
+    
+    Checks$SD.E <- apply(Checks, 1, 
+                         FUN=function(row) sqrt(V.N0N(pi_0,pi_1,row["N0"],row["N"],rho_1,pi_e,rho_2)))
+    Checks$C.75 <- apply(Checks, 1, FUN=function(row) 
+      C.N0N(C_1, C_2, C_e, row["N0"], row["N"], rho_1, pi_e, quantile=0.75))
+    Checks$C.90 <- apply(Checks, 1, FUN=function(row) 
+      C.N0N(C_1, C_2, C_e, row["N0"], row["N"], rho_1, pi_e, quantile=0.90))
+    
+    Checks <- Checks %>%
+      dplyr::mutate(N1.E=N*pi_e,
+                    N1=round(N1.E))
+    Checks$C.N1 <- apply(Checks, 1, FUN=function(row) 
+      C.N0N1N(C_1, C_2, C_e, row["N0"], row["N1"], row["N"]))
+    Checks$SD.N1 <- apply(Checks, 1, FUN=function(row) 
+      sqrt(V.N0N1(pi_0,pi_1,row["N0"],row["N1"],rho_2)))
+    Checks$Power.N1 <- apply(Checks, 1, FUN=function(row) 
+      VToDelta(pi_0, pi_1, row["SD.N1"]^2, alpha))
     return(Checks)
   } else {
     stop("No combination found that meets required budget Try increasing NumCheck.")
