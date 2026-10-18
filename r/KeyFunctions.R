@@ -1,22 +1,36 @@
 library(tidyverse)
 
 ## Core Functions
-Var.N1 <- function(p0,p1,N0,N1) {p0*(1-p0)/N0+p1*(1-p1)/N1}
-Var.E <- function(p0,p1,N0,pi_exp,N) {p0*(1-p0)/N0+p1*(1-p1)*sum(dbinom(x=1:N, size=N, prob=pi_exp)*1/(1:N))}
-Power.N1 <- function(p0,p1,N0,N1,alpha=0.05) {pnorm(qnorm(1-alpha/2)-abs(p1-p0)/(sqrt(p1*(1-p1)/N1+p0*(1-p0)/N0)), 0, 1, lower.tail=FALSE)}
-Power.E <- function(p0,p1,N0,pi_exp,N,alpha=0.05) {sum(dbinom(x=1:N, size=N, prob=pi_exp)*sapply(1:N, function(x) Power.N1(p0,p1,N0,x,alpha)))}
-B.N1 <- function(C1,C2,C3,N0,N1,N) {N*C1+N1*C2+(N1+N0)*C3}
-B.E <- function(C1,C2,C3,N0,pi_exp,N) {N*C1+N*pi_exp*C2+(N*pi_exp+N0)*C3}
-B.quant <- function(C1,C2,C3,N0,pi_exp,N,quantile) {N*C1+qbinom(p=quantile, size=N, prob=pi_exp)*(C2+C3)+N0*C3}
-Var.FromPower <- function(p0,p1,power,alpha=0.05) {(p1-p0)^2/(qnorm(1-alpha/2)-qnorm(1-power))^2}
+DeltaToV <- function(pi_0,pi_1,Delta,alpha=0.05) {(pi_1-pi_0)^2/(qnorm(1-alpha/2)-qnorm(1-Delta))^2}
+VToDelta <- function(pi_0,pi_1,V,alpha=0.05) {1-pnorm(qnorm(1-alpha/2)-abs(pi_1-pi_0)/sqrt(V))}
+V.M0M1 <- function(pi_0,pi_1,M_0,M_1) {pi_0*(1-pi_0)/M_0+pi_1*(1-pi_1)/M_1}
+V.N0N1 <- function(pi_0,pi_1,N_0,N_1,rho_2) {
+  N_0 <- floor(N_0)
+  N_1 <- floor(N_1)
+  pi_0*(1-pi_0)*sum(sapply(1:N_0, function(x) 1/x*dbinom(x, N_0, rho_2))) +
+    pi_1*(1-pi_1)*sum(sapply(1:N_1, function(x) 1/x*dbinom(x, N_1, rho_2)))
+}
+V.N0N <- function(pi_0,pi_1,N_0,N,rho_1,pi_e,rho_2) {
+  N_0 <- floor(N_0)
+  N <- floor(N)
+  pi_0*(1-pi_0)*sum(sapply(1:N_0, function(x) 1/x*dbinom(x, N_0, rho_2))) +
+    pi_1*(1-pi_1)*sum(sapply(1:N, function(y) 1/y*dbinom(y, N, rho_1*pi_e*rho_2)))
+}
+C.NN0N1 <- function(C_1, C_2, C_e, N, N_0, N_1) {
+  N*C_1+(N_0+N_1)*C_2+N_1*C_e
+}
+C.NN0 <- function(C_1, C_2, C_e, N, N_0, rho_1, pi_e) {
+  N*C_1+N_0*C_2+N*rho_1*pi_e*(C_2+C_e)
+}
 
-## Non-Random Optimum-Finding Functions
-N.star.V <- function(C1,C2,C3,p0,p1,pi_exp,V) {p1*(1-p1)/(pi_exp*V) + sqrt(C3*p0*(1-p0)*p1*(1-p1)/(pi_exp*V^2*(C1+pi_exp*C2+pi_exp*C3)))}
-N.star.B <- function(C1,C2,C3,p0,p1,pi_exp,B) {(B*p1*(1-p1)-sqrt(B^2*C3/(C1+pi_exp*C2+pi_exp*C3)*pi_exp*p0*(1-p0)*p1*(1-p1)))/((C1+pi_exp*C2+pi_exp*C3)*p1*(1-p1)-C3*pi_exp*p0*(1-p0))}
+## Approximate Optima Functions
+N.star.V2 <- function(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, rho_2, V) {
+  (pi_1*(1-pi_1)+sqrt(C_2*rho_1*pi_e*pi_0*(1-pi_0)*pi_1*(1-pi_1)/(C_1+rho_1*pi_e*C_2+rho_1*pi_e*C_e)))/(V*rho_1*pi_e*rho_2) 
+}
 
-##### Using new notation from latex file:
 N.star.B2 <- function(pi_e, pi_0, pi_1, C_1, C_2, C_e, rho_1, B) {
-  B*(pi_1*(1-pi_1)-sqrt(pi_0*(1-pi_0)*pi_1*(1-pi_1)*C_2*rho_1*pi_e/(C_1+pi_e*C_2+pi_e*C_e)))/((C_1+pi_e*C_2+pi_e*C_e)*pi_1*(1-pi_1)-C_2*rho_1*pi_e*pi_0*(1-pi_0))}
+  B*(pi_1*(1-pi_1)-sqrt(pi_0*(1-pi_0)*pi_1*(1-pi_1)*C_2*rho_1*pi_e/(C_1+rho_1*pi_e*C_2+rho_1*pi_e*C_e)))/((C_1+rho_1*pi_e*C_2+rho_1*pi_e*C_e)*pi_1*(1-pi_1)-C_2*rho_1*pi_e*pi_0*(1-pi_0))
+}
 
 ## Dynamic Optimum-Finding Functions
 CheckSet.P <- function(Starts,
