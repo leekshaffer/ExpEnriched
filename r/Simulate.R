@@ -1,36 +1,30 @@
 library(tidyverse)
-source("R/KeyFunctions.R")
-options(scipen=8)
+source("r/KeyFunctions.R")
+source("r/Optimize.R")
 
-SimOne <- function(
-    N, N0,
+## At Interim Analysis:
+
+SimOneInt <- function(
+    N0, N1,
     pi_0, pi_1,
-    rho_1, pi_e, rho_2,
-    C_1, C_2, C_e,
-    alpha=0.05) {
+    rho_2,
+    alpha=0.05,
+    FailStart=0) {
   
-  Failures <- 0
-  
-  M <- rbinom(1, size=N, prob=rho_1)
-  N1 <- rbinom(1, size=M, prob=pi_e)
-  
-  if (M <= 0 | N1 <= 0 | (N0+N1) > M) {
-    warning("Trial simulation resulted in impermissible N1 size")
-    Failures <- Failures+1
-    return(SimOne(N, N0, pi_exp, p0, p1, C1, C2, C3, alpha))
-  }
+  Failures <- FailStart
   
   M0 <- rbinom(1, size=N0, prob=rho_2)
   M1 <- rbinom(1, size=N1, prob=rho_2)
   
+  if (M0 == 0 | M1 == 0) {
+    warning("Trial simulation resulted in impermissible M0 or M1 size")
+    Failures <- Failures+1
+    return(SimOneInt(N0, N1, pi_0, pi_1, rho_2, alpha, FailStart=Failures))
+  }
+  
   N_Vals <- c(Failures=Failures,
               N0=N0, N1=N1,
-              M=M, M0=M0, M1=M1,
-              SD.N1=sqrt(V.N0N1(pi_0,pi_1,N0,N1,rho_2)),
-              Power.N1=VToDelta(pi_0,pi_1,
-                                V.N0N1(pi_0,pi_1,N0,N1,rho_2),
-                                alpha),
-              C.N1=C.N0N1N(C_1, C_2, C_e, N0, N1, N),
+              M0=M0, M1=M1,
               SD.M0M1=sqrt(V.M0M1(pi_0,pi_1,M0,M1)),
               Power.M0M1=VToDelta(pi_0,pi_1,
                                   V.M0M1(pi_0,pi_1,M0,M1),
@@ -79,6 +73,53 @@ SimOne <- function(
   return(c(N_Vals,Res_Vals))
 }
 
+SimManyInt <- function(NoSims,
+                       N0, N1,
+                       pi_0, pi_1,
+                       rho_2,
+                       alpha=0.05) {
+  Res <- as_tibble(t(replicate(n=NoSims, expr=SimOneInt(N0, N1,
+                                                        pi_0, pi_1,
+                                                        rho_2,
+                                                        alpha=0.05))))
+  
+  Res$SD.N1=sqrt(V.N0N1(pi_0,pi_1,N0,N1,rho_2))
+  Res$Power.N1=Delta.N0N1(pi_0,pi_1,N0,N1,rho_2,alpha)
+  return(Res %>% dplyr::select(Failures,N0,N1,M0,M1,
+                               SD.N1,Power.N1,everything()))
+}
+
+## As of Beginning of Study:
+
+SimOne <- function(
+    N, N0,
+    pi_0, pi_1,
+    rho_1, pi_e, rho_2,
+    C_1, C_2, C_e,
+    alpha=0.05,
+    FailStart=0) {
+  
+  Failures <- FailStart
+  
+  M <- rbinom(1, size=N, prob=rho_1)
+  N1 <- rbinom(1, size=M, prob=pi_e)
+  
+  if (M <= 0 | N1 <= 0 | (N0+N1) > M) {
+    warning("Trial simulation resulted in impermissible N1 size")
+    Failures <- Failures+1
+    return(SimOne(N, N0,
+                  pi_0, pi_1,
+                  rho_1, pi_e, rho_2,
+                  C_1, C_2, C_e,
+                  alpha,
+                  FailStart=Failures))
+  } else {
+    return(c(SimOneInt(N0, N1, pi_0, pi_1, rho_2, alpha,
+                     FailStart=Failures),
+             C.N1=C.N0N1N(C_1, C_2, C_e, N0, N1, N)))
+  }
+}
+
 SimMany <- function(NoSims,
                     N, N0,
                     pi_0, pi_1,
@@ -92,16 +133,94 @@ SimMany <- function(NoSims,
                                               alpha=0.05))))
 }
 
+## As of Beginning of Study with Interim Adjustment:
+### Warning: this is a bit slow to run (~3 mins per 100 simulations)
 
-set.seed(20261018)
-Sim80 <- SimMany(NoSims=2000,
-                 N=1651, N0=369,
-                 pi_0=0.1, pi_1=0.25,
-                 rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-                 C_1=1000, C_2=500, C_e=200,
-                 alpha=0.05)
-sum(Sim80$Failures)
-apply(Sim80 %>% dplyr::select(ends_with("N1"),ends_with(".Est"),ends_with(".SE"),ends_with(".CI.inc")), 2, mean)
-apply(Sim80 %>% dplyr::select(ends_with(".p")), 2, function(x) mean(x < 0.05))
+SimOneAdj <- function(
+    N, N0_Max=NULL, DeltaAdj,
+    pi_0, pi_1,
+    rho_1, pi_e, rho_2,
+    C_1, C_2, C_e,
+    alpha=0.05,
+    FailStart=0) {
+  
+  Failures <- FailStart
+  
+  M <- rbinom(1, size=N, prob=rho_1)
+  N1 <- rbinom(1, size=M, prob=pi_e)
+  if (is.null(N0_Max)) {
+    N0 <- M-N1
+  } else {
+    N0 <- min(N0_Max, M-N1)
+  }
+  
+  
+  if (M <= 0 | N1 <= 0 | N0 <= 0) {
+    warning("Trial simulation resulted in impermissible M, N1, or N0 size")
+    Failures <- Failures+1
+    return(SimOneAdj(N, N0, DeltaAdj,
+                  pi_0, pi_1,
+                  rho_1, pi_e, rho_2,
+                  C_1, C_2, C_e,
+                  alpha,
+                  FailStart=Failures))
+  } else {
+    Adj <- OptimalIntBudget(DeltaAdj, pi_0, pi_1, rho_2, C_2, N0, N1, alpha, NumCheck=2)
+    return(c(SimOneInt(Adj$N0, Adj$N1, pi_0, pi_1, rho_2, alpha,
+                       FailStart=Failures),
+             C.N1=N*C_1+N1*C_e+Adj$C.Remaining))
+  }
+}
 
+SimManyAdj <- function(NoSims,
+                    N, N0_Max=NULL, Delta.Adj,
+                    pi_0, pi_1,
+                    rho_1, pi_e, rho_2,
+                    C_1, C_2, C_e,
+                    alpha=0.05) {
+  as_tibble(t(replicate(n=NoSims, expr=SimOneAdj(N, N0_Max, Delta.Adj,
+                                              pi_0, pi_1,
+                                              rho_1, pi_e, rho_2,
+                                              C_1, C_2, C_e,
+                                              alpha=0.05))))
+}
 
+## For Comparison Prospective Cohort Study:
+
+SimOneComp <- function(N,
+                       pi_0, pi_1,
+                       rho_1, pi_e, rho_2,
+                       C_1, C_2, C_e,
+                       alpha=0.05,
+                       FailStart=0) {
+  M <- rbinom(n=1, size=N, prob=rho_1)
+  N1 <- rbinom(n=1, size=M, prob=pi_e)
+  N0 <- M-N1
+  C.Full <- C_1*N + C_2*M + C_e*N1
+  if (N1 <= 0 | N0 <= 0) {
+    Failures = FailStart + 1
+    SimOneComp(N, pi_0, pi_1, rho_1, pi_e, rho_2, alpha,
+               FailStart=Failures)
+  } else {
+    Res <- SimOneInt(N0, N1,
+                     pi_0, pi_1,
+                     rho_2,
+                     alpha,
+                     FailStart=Failures)
+    return(c(Res, C.Full=C.Full))
+  }
+}
+
+SimManyComp <- function(NoSims,
+                        N,
+                        pi_0, pi_1,
+                        rho_1, pi_e, rho_2,
+                        C_1, C_2, C_e,
+                        alpha=0.05) {
+  as_tibble(t(replicate(n=NoSims, expr=SimOneComp(N,
+                                                  pi_0, pi_1,
+                                                  rho_1, pi_e, rho_2,
+                                                  C_1, C_2, C_e,
+                                                  alpha=0.05,
+                                                  FailStart=0))))
+}

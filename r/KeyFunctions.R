@@ -27,14 +27,11 @@ C.N0N <- function(C_1, C_2, C_e, N_0, N, rho_1, pi_e, quantile=NULL) {
   }
 }
 Delta.N0N1 <- function(pi_0, pi_1, N_0, N_1, rho_2, alpha=0.05) {
-  mat <- cross_join(tibble(M0=1:N_0), tibble(M1=1:N_1)) %>%
-    dplyr::mutate(P0=dbinom(M0, size=N_0, prob=rho_2),
-                  P1=dbinom(M1, size=N_1, prob=rho_2))
-  mat$V = apply(mat, 1, function(row)
-    V.M0M1(pi_0,pi_1,row["M0"],row["M1"]))
-  mat$Delta <- apply(mat, 1, function(row)
-    VToDelta(pi_0, pi_1, row["V"], alpha))
-  return(sum(mat$P0*mat$P1*mat$Delta))
+  mat <- cross_join(tibble(M0=1:N_0), tibble(M1=1:N_1)) 
+  return(sum(apply(mat, 1, function(row)
+    dbinom(row["M0"], size=N_0, prob=rho_2)*
+      dbinom(row["M1"], size=N_1, prob=rho_2)*
+      VToDelta(pi_0, pi_1, V.M0M1(pi_0, pi_1, row["M0"], row["M1"])))))
 }
 
 ## Approximate Optima Functions
@@ -144,4 +141,33 @@ CheckSet.B <- function(Starts,
   } else {
     stop("No combination found that meets required budget Try increasing NumCheck.")
   }
+}
+
+## Functions for Comparison Prospective Design
+
+V.Comp.Est <- function(pi_0, pi_1, N, rho_1, pi_e, rho_2) {
+  return(pi_0*(1-pi_0)/(N*rho_1*(1-pi_e)*rho_2)+pi_1*(1-pi_1)/(N*rho_1*pi_e*rho_2))
+}
+# 
+# Delta.Comp.Full <- function(pi_0, pi_1, N, rho_1, pi_e, rho_2, alpha=0.05) {
+#   return(sum(sapply(2:N, function(m) dbinom(m, size=N, prob=rho_1)*
+#                sum(sapply(1:(m-1), function(n1) dbinom(n1, size=m, prob=pi_e)*
+#                             sum(apply(cross_join(tibble(j=1:n1), tibble(k=1:(m-n1))),
+#                                       1, function(row) dbinom(row["j"], size=n1, prob=rho_2)*
+#                                         dbinom(row["k"], size=m-n1, prob=rho_2)*
+#                                         VToDelta(pi_0, pi_1, V.M0M1(pi_0, pi_1, row["k"], row["j"]) , alpha))))))))
+# }
+
+N.star.V.Comp <- function(pi_0, pi_1, rho_1, pi_e, rho_2, V) {
+  return((pi_0*(1-pi_0)*pi_e+pi_1*(1-pi_1)*(1-pi_e))/(pi_e*(1-pi_e)*rho_1*rho_2*V))
+}
+
+N.star.Delta.Comp <- function(pi_0, pi_1, rho_1, pi_e, rho_2, Delta, alpha=0.05) {
+  N.star.V.Comp(pi_0, pi_1, rho_1, pi_e, rho_2,
+                DeltaToV(pi_0, pi_1, Delta, alpha))
+}
+
+BToN.Comp <- function(B, rho_1, pi_e, 
+                      C_1, C_2, C_e) {
+  return(B/(C_1+C_2*rho_1+C_e*rho_1*pi_e))
 }

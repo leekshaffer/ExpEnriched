@@ -1,5 +1,5 @@
 library(tidyverse)
-source("R/KeyFunctions.R")
+source("r/KeyFunctions.R")
 
 ## Approach 1: Set Minimum Overall Power, then Minimize Expected (Or Quantile) Budget
 
@@ -102,32 +102,6 @@ OptimalBudget <- function(Delta,
   }
 }
 
-OptimalBudget(Delta=0.8,
-              pi_0=0.1, pi_1=0.25,
-              rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-              C_1=1000, C_2=500, C_e=200,
-              alpha=0.05,
-              NumCheck=0,
-              quantile=NULL)
-
-OptimalBudget(Delta=0.8,
-              pi_0=0.1, pi_1=0.25,
-              rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-              C_1=1000, C_2=500, C_e=200,
-              alpha=0.05,
-              NumCheck=20,
-              quantile=NULL)
-
-
-OptimalBudget(Delta=0.8,
-              pi_0=0.1, pi_1=0.25,
-              rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-              C_1=1000, C_2=500, C_e=200,
-              alpha=0.05,
-              NumCheck=20,
-              quantile=0.75)
-
-
 ## Approach 2: Set Maximum Expected (Or Quantile) Budget, then Minimize Overall Power
 
 OptimalPower <- function(B,
@@ -224,15 +198,6 @@ OptimalPower <- function(B,
   }
 }
 
-OptimalPower(B=1900000,
-             pi_0=0.1,pi_1=0.25,
-             rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-             C_1=1000, C_2=500, C_e=200,
-             alpha=0.05,
-             NumCheck=5,
-             quantile=NULL)
-
-
 ## Interim Optimization:
 
 ### Fixed Budget
@@ -287,18 +252,4 @@ OptimalIntBudget <- function(Delta,
   
   return(Checks)
 }
-
-OptimalIntBudget(Delta=0.8,
-                 pi_0=0.1,pi_1=0.25,
-                 rho_2=0.96^2, C_2=500,
-                 N_0=369, N_1=83,
-                 alpha=0.05,
-                 NumCheck=5)
-
-OptimalIntBudget(Delta=0.8,
-                 pi_0=0.1,pi_1=0.25,
-                 rho_2=0.96^2, C_2=500,
-                 N_0=369, N_1=79,
-                 alpha=0.05,
-                 NumCheck=5)
 
