@@ -46,7 +46,7 @@ OptimalBudget <- function(Delta,
   Combos$SD.N1 <- apply(Combos, 1, FUN=function(row) 
     sqrt(V.N0N1(pi_0,pi_1,row["N0"],row["N1"],rho_2)))
   Combos$Power.N1 <- apply(Combos, 1, FUN=function(row) 
-    VToDelta(pi_0,pi_1,row["SD.N1"]^2,alpha))
+    Delta.N0N1(pi_0,pi_1,row["N0"],row["N1"],rho_2,alpha))
   Combos$C.val <- apply(Combos, 1, FUN=function(row) 
     C.N0N(C_1, C_2, C_e, row["N0"], row["N"], rho_1, pi_e, quantile))
   Combos$C.E <- apply(Combos, 1, FUN=function(row) 
@@ -88,6 +88,8 @@ OptimalBudget <- function(Delta,
       Starts <- tibble(N=min(ComboBest$N), N0=min(ComboBest$N0))
       NumCheck <- NumCheck+max(max(ComboBest$N)-min(ComboBest$N),
                                max(ComboBest$N0)-min(ComboBest$N0))
+    } else {
+      Starts <- ComboBest
     }
     return(CheckSet.P(Starts,
                       Delta,
@@ -196,7 +198,7 @@ OptimalPower <- function(B,
     ComboBest$SD.N1 <- apply(ComboBest, 1, FUN=function(row) 
       sqrt(V.N0N1(pi_0,pi_1,row["N0"],row["N1"],rho_2)))
     ComboBest$Power.N1 <- apply(ComboBest, 1, FUN=function(row) 
-      VToDelta(pi_0,pi_1,row["SD.N1"]^2,alpha))
+      Delta.N0N1(pi_0,pi_1,row["N0"],row["N1"],rho_2,alpha))
     return(ComboBest %>%
              dplyr::select(N,N0,Power.E,C.val,
                            C.E,SD.E,
@@ -229,3 +231,60 @@ OptimalPower(B=1900000,
              alpha=0.05,
              NumCheck=5,
              quantile=NULL)
+
+
+## Interim Optimization:
+
+### Fixed Budget
+
+OptimalIntBudget <- function(Delta,
+                             pi_0, pi_1,
+                             rho_2, C_2,
+                             N_0, N_1,
+                             alpha=0.05,
+                             NumCheck=5) {
+  Power.Max <- Delta.N0N1(pi_0, pi_1, N_0, N_1, rho_2, alpha)
+  if (Power.Max < Delta) {
+    warning("The desired power cannot be achieved with these N values. The function will return the maximum power.")
+    Checks <- tibble(N0=N_0, N1=N_1, Power.E=Power.Max) %>%
+      dplyr::mutate(C.Remaining=(N_0+N_1)*C_2,
+                    SD.E=sqrt(V.N0N1(pi_0, pi_1, N_0, N_1, rho_2)))
+  } else {
+    V_Est <- DeltaToV(pi_0,pi_1,Delta,alpha=0.05)
+    if (N_1 <= N_0) {
+      M1_Est <- N_1*rho_2
+      M0_Est <- (pi_0*(1-pi_0))/(V_Est-pi_1*(1-pi_1)/M1_Est)
+      N0_Start <- M0_Est/rho_2
+      Checks <- tibble(N0=(floor(N0_Start)):min((floor(N0_Start)+NumCheck),N_0),
+                       N1=N_1)
+    } else {
+      M0_Est <- N_0*rho_2
+      M1_Est <- (pi_1*(1-pi_1))/(V_Est-pi_0*(1-pi_0)/M0_Est)
+      N1_Start <- N1_Est/rho_2
+      Checks <- tibble(N0=N_0,
+                       N1=N_1(floor(N1_Start)):min((floor(N1_Start)+NumCheck),N_1))
+    }
+  
+    Checks$Power.E <- apply(Checks, 1, function(row) 
+      Delta.N0N1(pi_0, pi_1, row["N0"], row["N1"], rho_2, alpha))
+    
+    if (max(Checks$Power.E) < Delta) {
+      message("No combination found that achieves desired power. Increasing NumCheck.")
+      return(OptimalIntBudget(Delta, pi_0, pi_1, rho_2, C_2,
+                         N_0, N_1, alpha,
+                         2*(NumCheck+1)))
+    } else {
+      Checks <- Checks %>%
+        dplyr::filter(Power.E >= Delta)
+      Checks <- Checks %>%
+        dplyr::filter(N0==min(Checks$N0),
+                      N1==min(Checks$N1))
+    }
+    Checks$C.Remaining <- (Checks$N0+Checks$N1)*C_2
+    Checks$SD.E <- apply(Checks, 1, function(row)
+      sqrt(V.N0N1(pi_0,pi_1,row["N0"], row["N1"],rho_2)))
+  }
+  
+  return(Checks)
+}
+

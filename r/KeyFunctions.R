@@ -26,6 +26,16 @@ C.N0N <- function(C_1, C_2, C_e, N_0, N, rho_1, pi_e, quantile=NULL) {
     N*C_1+N_0*C_2+qbinom(p=quantile, size=N, prob=rho_1*pi_e)*(C_2+C_e)
   }
 }
+Delta.N0N1 <- function(pi_0, pi_1, N_0, N_1, rho_2, alpha=0.05) {
+  mat <- cross_join(tibble(M0=1:N_0), tibble(M1=1:N_1)) %>%
+    dplyr::mutate(P0=dbinom(M0, size=N_0, prob=rho_2),
+                  P1=dbinom(M1, size=N_1, prob=rho_2))
+  mat$V = apply(mat, 1, function(row)
+    V.M0M1(pi_0,pi_1,row["M0"],row["M1"]))
+  mat$Delta <- apply(mat, 1, function(row)
+    VToDelta(pi_0, pi_1, row["V"], alpha))
+  return(sum(mat$P0*mat$P1*mat$Delta))
+}
 
 ## Approximate Optima Functions
 NVtoN0 <- function(pi_0,pi_1,rho_1,pi_e,rho_2,N,V) {
@@ -87,7 +97,7 @@ CheckSet.P <- function(Starts,
     Checks$SD.N1 <- apply(Checks, 1, FUN=function(row) 
       sqrt(V.N0N1(pi_0,pi_1,row["N0"],row["N1"],rho_2)))
     Checks$Power.N1 <- apply(Checks, 1, FUN=function(row) 
-      VToDelta(pi_0, pi_1, row["SD.N1"]^2, alpha))
+      Delta.N0N1(pi_0, pi_1, row["N0"],row["N1"],rho_2, alpha))
     return(Checks)
   } else {
     stop("No combination found that meets required power. Try increasing NumCheck.")
@@ -129,7 +139,7 @@ CheckSet.B <- function(Starts,
     Checks$SD.N1 <- apply(Checks, 1, FUN=function(row) 
       sqrt(V.N0N1(pi_0,pi_1,row["N0"],row["N1"],rho_2)))
     Checks$Power.N1 <- apply(Checks, 1, FUN=function(row) 
-      VToDelta(pi_0, pi_1, row["SD.N1"]^2, alpha))
+      Delta.N0N1(pi_0, pi_1, row["N0"],row["N1"],rho_2, alpha))
     return(Checks)
   } else {
     stop("No combination found that meets required budget Try increasing NumCheck.")
