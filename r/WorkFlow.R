@@ -3,6 +3,17 @@ source("R/Optimize.R")
 source("R/Simulate.R")
 options(scipen=8)
 
+## Numbers to use:
+OptimalBudget(Delta=0.8,
+              pi_0=0.2, pi_1=0.35,
+              rho_1=0.92, pi_e=0.05, rho_2=0.964,
+              C_1=1000, C_2=500, C_e=200,
+              alpha=0.05,
+              NumCheck=20,
+              quantile=NULL)
+
+
+
 ## Optimizing:
 
 OptimalBudget(Delta=0.8,
@@ -14,7 +25,7 @@ OptimalBudget(Delta=0.8,
               quantile=NULL)
 
 OptimalBudget(Delta=0.8,
-              pi_0=0.1, pi_1=0.25,
+              pi_0=0.2, pi_1=0.35,
               rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
               C_1=1000, C_2=500, C_e=200,
               alpha=0.05,
