@@ -288,3 +288,17 @@ OptimalIntBudget <- function(Delta,
   return(Checks)
 }
 
+OptimalIntBudget(Delta=0.8,
+                 pi_0=0.1,pi_1=0.25,
+                 rho_2=0.96^2, C_2=500,
+                 N_0=369, N_1=83,
+                 alpha=0.05,
+                 NumCheck=5)
+
+OptimalIntBudget(Delta=0.8,
+                 pi_0=0.1,pi_1=0.25,
+                 rho_2=0.96^2, C_2=500,
+                 N_0=369, N_1=79,
+                 alpha=0.05,
+                 NumCheck=5)
+
