@@ -165,7 +165,7 @@ CheckSet.B <- function(StartN,
                        C_1, C_2, C_e,
                        alpha=0.05,
                        restrict=5,
-                       NumCheck=5,
+                       NumCheck=6,
                        round=3) {
   Checks <- tibble(N=(StartN-NumCheck):(StartN+NumCheck)) %>%
     dplyr::mutate(nu=nu.B(pi_e, rho_1, C_1, C_2, C_e, N, B, round),
@@ -179,9 +179,38 @@ CheckSet.B <- function(StartN,
   if (nrow(Checks) > 1) {
     Checks <- Checks %>% dplyr::filter(Cost.E==min(Cost.E))
   }
-  if (Checks$N==StartN-NumCheck | Checks$N==StartN+NumCheck) {
-    warning("The optimum was at the end of the range. Consider increasing NumCheck or re-running with the output as the new StartN.")
+  if (Checks$N==StartN-NumCheck) {
+    Flag <- TRUE
+    while (Flag) {
+      message(paste0("The optimum was at the bottom of the range. Checking beyond the range."))
+      Checks1 <- tibble(N=Checks$N-1) %>%
+        mutate(nu=nu.B(pi_e, rho_1, C_1, C_2, C_e, N, B, round),
+               Cost.E=C.N(C_1, C_2, C_e, nu, pi_e, rho_1, N, quantile=NULL),
+               Power=Delta.N(theta, s_0, s_1, nu, pi_e, rho_1, rho_2,
+                             N, alpha, restrict))
+      if (Checks1$Cost.E > B | Checks1$Power < Checks$Power) {
+        Flag <- FALSE
+      } else {
+        Checks <- Checks1
+      }
+    }
+  } else if (Checks$N==StartN+NumCheck) {
+    Flag <- TRUE
+    while (Flag) {
+      message(paste0("The optimum was at the top of the range. Checking beyond the range."))
+      Checks1 <- tibble(N=Checks$N+1) %>%
+        mutate(nu=nu.B(pi_e, rho_1, C_1, C_2, C_e, N, B, round),
+               Cost.E=C.N(C_1, C_2, C_e, nu, pi_e, rho_1, N, quantile=NULL),
+               Power=Delta.N(theta, s_0, s_1, nu, pi_e, rho_1, rho_2,
+                N, alpha, restrict))
+      if (Checks1$Cost.E > B | Checks1$Power < Checks$Power) {
+        Flag <- FALSE
+      } else {
+        Checks <- Checks1
+      }
+    }
   }
+
   Checks <- Checks %>% dplyr::mutate(
     SD=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
     Ns.E=N*nu,
