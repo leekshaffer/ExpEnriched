@@ -7,7 +7,7 @@ options(scipen=8)
 OptimalBudget(Delta=0.8,
               pi_0=0.2, pi_1=0.35,
               rho_1=0.92, pi_e=0.05, rho_2=0.964,
-              C_1=1000, C_2=500, C_e=200,
+              C_1=90, C_2=90, C_e=160,
               alpha=0.05,
               NumCheck=20,
               quantile=NULL)
