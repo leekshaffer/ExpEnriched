@@ -276,6 +276,7 @@ CheckSet.D <- function(StartN,
                         pi_e, rho_1, rho_2, StartN+NumCheck, alpha, restrict)
     }
     
+    # print("Left While Loop")
     Checks <- cross_join(tibble(N=StartN+(0:NumCheck)),
                          tibble(nu=nu.V(s_0, s_1, pi_e, rho_1, C_1, C_2, C_e, round)+
                                   10^(-1*round)*(0:nuCheck)))
@@ -286,10 +287,12 @@ CheckSet.D <- function(StartN,
     }
   }
   
+  # print("Starting Power Calcs")
   Checks$Power <- apply(Checks, 1, function(row) {
     Delta.N(theta, s_0, s_1, row["nu"], pi_e, rho_1, rho_2,
             row["N"], alpha, restrict)
   })
+  print("Finished Power Calcs")
   Checks <- Checks %>% dplyr::filter(Power >= Delta)
   Checks$Cost.E <- apply(Checks, 1, function(row) {
     C.N(C_1, C_2, C_e, row["nu"], pi_e, rho_1, row["N"], quantile=NULL)

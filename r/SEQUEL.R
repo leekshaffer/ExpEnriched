@@ -1,154 +1,150 @@
 source("R/Simulate.R")
 options(scipen=8)
+options(warn=1)
 
-## Brought Over:
-sim <- SimMany(2000, 1925, .218, .4, 1, 1, .05, 1, .96, 120, 90, 180)
-apply(sim %>% dplyr::select(Est, Diff, AbsDiff, SE, CI.Incl, Sig, Cost), 2, mean)
-sd(sim$Est)
+## Exposure Prevalence:
+pi_e <- 0.05
 
-simComp <- SimManyComp(2000, 1925, .4, 1, 1, .05, 1, .96, 120, 90, 180)
-apply(simComp %>% dplyr::select(Est, Diff, AbsDiff, SE, CI.Incl, Sig, Cost), 2, mean)
-sd(simComp$Est)
+alpha <- 0.05
 
+## Rough Cost Numbers:
+C_1 <- 40
+C_2 <- 75*3+30*2
+# C_2.alt <- 125
+C_e <- 175
 
+## Rough LTFU Numbers:
+rho_1 <- 0.95
+rho_2 <- 0.96
 
-## Numbers to use:
-OptimalBudget(Delta=0.8,
-              pi_0=0.2, pi_1=0.35,
-              rho_1=0.92, pi_e=0.05, rho_2=0.964,
-              C_1=90, C_2=90, C_e=160,
+## Aim 1, Continuous Outcome:
+s_0 <- 1
+s_1 <- 1
+theta <- 0.4
+
+Design.1 <- OptimalBudget(Delta=0.9,
+              theta, s_0, s_1,
+              pi_e, rho_1, rho_2,
+              C_1, C_2, C_e,
               alpha=0.05,
-              NumCheck=20,
-              quantile=NULL)
+              restrict=5,
+              NumCheck=10,
+              nuCheck=2,
+              round=3)
+Design.1
+
+## Fixing N=2000 at nu=15%:
+Design.1.alt <- tibble(N=2000, nu=0.15) %>%
+  dplyr::mutate(Power=Delta.N(theta, s_0, s_1,
+                              nu, pi_e, rho_1, rho_2, N, alpha=0.05, restrict=5),
+                SD=sqrt(V.N(s_0,s_1,nu,pi_e,rho_1,rho_2,N,
+                             restrict=5)),
+                Cost.E=C.N(C_1, C_2, C_e, nu, pi_e, rho_1, N),
+                Ns.E=N*nu,
+                M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
+                M1.E=N*rho_1*pi_e*rho_2)
+Design.1.alt
+
+set.seed(20261023)
+
+Sim.1 <- SimMany(1000, N=Design.1$N, nu=Design.1$nu,
+                 theta, s_0, s_1, pi_e, rho_1, rho_2, C_1, C_2, C_e)
+Sim.1.alt <- SimMany(1000, N=Design.1.alt$N, nu=Design.1.alt$nu,
+                 theta, s_0, s_1, pi_e, rho_1, rho_2, C_1, C_2=C_2, C_e)
+
+SRes.1 <- c(apply(Sim.1 %>% 
+                  dplyr::select(Est, Diff, AbsDiff, SE, CI.Incl, Sig, Cost),
+                2, mean),
+            SD_Est=sd(Sim.1$Est))
+SRes.1.alt <- c(apply(Sim.1.alt %>% 
+                      dplyr::select(Est, Diff, AbsDiff, SE, CI.Incl, Sig, Cost),
+                    2, mean),
+                SD_Est=sd(Sim.1.alt$Est))
+
+Designs.1 <- tibble(Design=c("1","1.alt")) %>% bind_cols(
+  Design.1 %>% bind_rows(Design.1.alt))
+SRes.1 <- tibble(Design=c("1","1.alt")) %>% bind_cols(
+  SRes.1 %>% bind_rows(SRes.1.alt))
+
+save(list=c("Designs.1", "SRes.1",
+            "Sim.1","Sim.1.alt"),
+     file="out/Aim1_Designs.Rda")
 
 
+## Aim 2, Binary Outcome:
+pi_0 <- 0.2
+pi_1 <- 0.35
+s_0 <- sqrt(pi_0*(1-pi_0))
+s_1 <- sqrt(pi_1*(1-pi_1))
+theta <- abs(pi_1-pi_0)
 
-## Optimizing:
+Design.2 <- OptimalBudget(Delta=0.8,
+                          theta, s_0, s_1,
+                          pi_e, rho_1, rho_2,
+                          C_1, C_2, C_e,
+                          alpha=0.05,
+                          restrict=5,
+                          NumCheck=0,
+                          nuCheck=0,
+                          round=3)
 
-OptimalBudget(Delta=0.8,
-              pi_0=0.1, pi_1=0.25,
-              rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-              C_1=1000, C_2=500, C_e=200,
-              alpha=0.05,
-              NumCheck=0,
-              quantile=NULL)
+Designs.2 <- Designs.1 %>%
+  bind_rows(Design.2 %>% mutate(Design="2")) %>%
+  dplyr::select(Design,N,nu)
 
-OptimalBudget(Delta=0.8,
-              pi_0=0.2, pi_1=0.35,
-              rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-              C_1=1000, C_2=500, C_e=200,
-              alpha=0.05,
-              NumCheck=20,
-              quantile=NULL)
+Designs.2$Power <- apply(as.matrix(Designs.2 %>% dplyr::select(N,nu)), 
+                         1, function(row) {
+  Delta.N(theta, s_0, s_1, row["nu"], pi_e, rho_1, rho_2, row["N"],
+          alpha, restrict=5)
+})
+Designs.2$SD <- apply(as.matrix(Designs.2 %>% dplyr::select(N,nu)), 
+                      1, function(row) {
+                        sqrt(V.N(s_0, s_1, row["nu"], pi_e, rho_1, rho_2, row["N"], restrict=5))
+                      })
+Designs.2$Cost.E <- apply(as.matrix(Designs.2 %>% dplyr::select(N,nu)), 
+                          1, function(row) {
+                            C.N(C_1, C_2, C_e, row["nu"], pi_e, rho_1, row["N"], quantile=NULL)
+                          })
+Designs.2 <- Designs.2 %>%
+  dplyr::mutate(Ns.E=N*nu,
+                M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
+                M1.E=N*rho_1*pi_e*rho_2)
 
-OptimalBudget(Delta=0.8,
-              pi_0=0.1, pi_1=0.25,
-              rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-              C_1=1000, C_2=500, C_e=200,
-              alpha=0.05,
-              NumCheck=20,
-              quantile=0.75)
+set.seed(10232026)
 
-OptimalPower(B=1900000,
-             pi_0=0.1,pi_1=0.25,
-             rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-             C_1=1000, C_2=500, C_e=200,
-             alpha=0.05,
-             NumCheck=5,
-             quantile=NULL)
+Sim.2.1 <- SimManyBin(NoSims=1000,
+                      N=unname(Designs.2 %>% dplyr::filter(Design=="1") %>% pull(N)), 
+                      nu=unname(Designs.2 %>% dplyr::filter(Design=="1") %>% pull(nu)),
+                      pi_0, pi_1, pi_e, rho_1, rho_2, C_1, C_2, C_e, alpha)
+SRes.2.1 <- c(apply(Sim.2.1 %>% 
+                    dplyr::select(ends_with(c("Est", "Diff", "AbsDiff", "SE", "CI.Incl", "Sig", "Cost"))),
+                  2, mean),
+            RD.SD_Est=sd(Sim.2.1$RD.Est),
+            OR.SD_Est=sd(Sim.2.1$OR.Est))
 
-OptimalIntBudget(Delta=0.8,
-                 pi_0=0.1,pi_1=0.25,
-                 rho_2=0.96^2, C_2=500,
-                 N_0=369, N_1=83,
-                 alpha=0.05,
-                 NumCheck=5)
+Sim.2.1.alt <- SimManyBin(NoSims=1000,
+                      N=unname(Designs.2 %>% dplyr::filter(Design=="1.alt") %>% pull(N)), 
+                      nu=unname(Designs.2 %>% dplyr::filter(Design=="1.alt") %>% pull(nu)),
+                      pi_0, pi_1, pi_e, rho_1, rho_2, C_1, C_2, C_e, alpha)
+SRes.2.1.alt <- c(apply(Sim.2.1.alt %>% 
+                      dplyr::select(ends_with(c("Est", "Diff", "AbsDiff", "SE", "CI.Incl", "Sig", "Cost"))),
+                    2, mean),
+              RD.SD_Est=sd(Sim.2.1.alt$RD.Est),
+              OR.SD_Est=sd(Sim.2.1.alt$OR.Est))
 
-OptimalIntBudget(Delta=0.8,
-                 pi_0=0.1,pi_1=0.25,
-                 rho_2=0.96^2, C_2=500,
-                 N_0=369, N_1=79,
-                 alpha=0.05,
-                 NumCheck=5)
+Sim.2.2 <- SimManyBin(NoSims=1000,
+                      N=unname(Designs.2 %>% dplyr::filter(Design=="2") %>% pull(N)), 
+                      nu=unname(Designs.2 %>% dplyr::filter(Design=="2") %>% pull(nu)),
+                      pi_0, pi_1, pi_e, rho_1, rho_2, C_1, C_2, C_e, alpha)
+SRes.2.2 <- c(apply(Sim.2.2 %>% 
+                      dplyr::select(ends_with(c("Est", "Diff", "AbsDiff", "SE", "CI.Incl", "Sig", "Cost"))),
+                    2, mean),
+              RD.SD_Est=sd(Sim.2.2$RD.Est),
+              OR.SD_Est=sd(Sim.2.2$OR.Est))
 
-### Simulations:
-set.seed(20261022)
+SRes.2 <- tibble(Design=c("1","1.alt","2")) %>% bind_cols(
+  SRes.2.1 %>% bind_rows(SRes.2.1.alt, SRes.2.2))
 
-Sim80Int <- SimManyInt(NoSims=2000,
-                       N0=237, N1=83,
-                       pi_0=0.1, pi_1=0.25,
-                       rho_2=0.96^2,
-                       alpha=0.05)
-sum(Sim80Int$Failures)
-apply(Sim80Int %>% dplyr::select(ends_with("N1"),ends_with(".Est"),ends_with(".SE"),ends_with(".CI.inc")), 2, mean)
-apply(Sim80Int %>% dplyr::select(ends_with(".p")), 2, function(x) mean(x < 0.05))
-
-
-Sim80 <- SimMany(NoSims=2000,
-                 N=1651, N0=369,
-                 pi_0=0.1, pi_1=0.25,
-                 rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-                 C_1=1000, C_2=500, C_e=200,
-                 alpha=0.05)
-sum(Sim80$Failures)
-apply(Sim80 %>% dplyr::select(ends_with("N1"),ends_with(".Est"),ends_with(".SE"),ends_with(".CI.inc")), 2, mean)
-apply(Sim80 %>% dplyr::select(ends_with(".p")), 2, function(x) mean(x < 0.05))
-mean(Sim80$C.N1)
-save(Sim80, file="out/Sim80.Rda")
-
-
-Var2M <- OptimalPower(2000000, .1, .25, .96, .05, .96^2, 1000, 500, 200)
-Sim2M <- SimMany(NoSims=2000,
-                 N=1750, N0=382,
-                 pi_0=0.1, pi_1=0.25,
-                 rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-                 C_1=1000, C_2=500, C_e=200,
-                 alpha=0.05)
-sum(Sim2M$Failures)
-apply(Sim2M %>% dplyr::select(ends_with("N1"),ends_with(".Est"),ends_with(".SE"),ends_with(".CI.inc")), 2, mean)
-apply(Sim2M %>% dplyr::select(ends_with(".p")), 2, function(x) mean(x < 0.05))
-mean(Sim2M$C.N1)
-save(Sim2M, file="out/Sim80.Rda")
-
-
-Sim80Adj <- SimManyAdj(NoSims=1000,
-                       N=1651, N0_Max=500, Delta.Adj=.8,
-                       pi_0=0.1, pi_1=0.25,
-                       rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-                       C_1=1000, C_2=500, C_e=200,
-                       alpha=0.05)
-sum(Sim80Adj$Failures)
-apply(Sim80Adj %>% dplyr::select(ends_with("N1"),ends_with(".Est"),ends_with(".SE"),ends_with(".CI.inc")), 2, mean)
-apply(Sim80Adj %>% dplyr::select(ends_with(".p")), 2, function(x) mean(x < 0.05))
-save(Sim80Adj, file="out/Sim80Adj.Rda")
-
-## Comparisons:
-
-## At 80%:
-Sim80Comp <- SimManyComp(NoSims=2000,
-                         N=ceiling(N.star.Delta.Comp(0.1, 0.25, 0.96, 0.05, 0.96^2, 0.8)),
-                         pi_0=0.1, pi_1=0.25,
-                         rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-                         C_1=1000, C_2=500, C_e=200,
-                         alpha=0.05)
-sum(Sim80Comp$Failures)
-apply(Sim80Comp %>% dplyr::select(ends_with("N1"),ends_with(".Est"),ends_with(".SE"),ends_with(".CI.inc")), 2, mean)
-apply(Sim80Comp %>% dplyr::select(ends_with(".p")), 2, function(x) mean(x < 0.05))
-mean(Sim80Comp$C.Full)
-
-save(Sim80Comp, file="out/Sim80Comp.Rda")
-
-## At Budget = 2,000,000 (just above avg budget from exposure-enriched 80% power)
-Sim2MComp <- SimManyComp(NoSims=2000,
-                         N=floor(BToN.Comp(2000000, 0.96, 0.05, 
-                                           1000, 500, 200)),
-                         pi_0=0.1, pi_1=0.25,
-                         rho_1=0.96, pi_e=0.05, rho_2=0.96^2,
-                         C_1=1000, C_2=500, C_e=200,
-                         alpha=0.05)
-sum(Sim2MComp$Failures)
-apply(Sim2MComp %>% dplyr::select(ends_with("N1"),ends_with(".Est"),ends_with(".SE"),ends_with(".CI.inc")), 2, mean)
-apply(Sim2MComp %>% dplyr::select(ends_with(".p")), 2, function(x) mean(x < 0.05))
-mean(Sim2MComp$C.Full)
-
-save(Sim2MComp, file="out/Sim2MComp.Rda")
+save(list=c("Designs.2", "SRes.2",
+            "Sim.2.1","Sim.2.1.alt","Sim.2.2"),
+     file="out/Aim2_Designs.Rda")
