@@ -1,7 +1,16 @@
-source("R/KeyFunctions.R")
-source("R/Optimize.R")
 source("R/Simulate.R")
 options(scipen=8)
+
+## Brought Over:
+sim <- SimMany(2000, 1925, .218, .4, 1, 1, .05, 1, .96, 120, 90, 180)
+apply(sim %>% dplyr::select(Est, Diff, AbsDiff, SE, CI.Incl, Sig, Cost), 2, mean)
+sd(sim$Est)
+
+simComp <- SimManyComp(2000, 1925, .4, 1, 1, .05, 1, .96, 120, 90, 180)
+apply(simComp %>% dplyr::select(Est, Diff, AbsDiff, SE, CI.Incl, Sig, Cost), 2, mean)
+sd(simComp$Est)
+
+
 
 ## Numbers to use:
 OptimalBudget(Delta=0.8,
