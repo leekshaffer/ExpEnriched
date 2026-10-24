@@ -212,7 +212,7 @@ CheckSet.B <- function(StartN,
   }
 
   Checks <- Checks %>% dplyr::mutate(
-    SD=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
+    SE=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
     Ns.E=N*nu,
     M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
     M1.E=N*rho_1*pi_e*rho_2
@@ -292,7 +292,7 @@ CheckSet.D <- function(StartN,
     Delta.N(theta, s_0, s_1, row["nu"], pi_e, rho_1, rho_2,
             row["N"], alpha, restrict)
   })
-  print("Finished Power Calcs")
+  # print("Finished Power Calcs")
   Checks <- Checks %>% dplyr::filter(Power >= Delta)
   Checks$Cost.E <- apply(Checks, 1, function(row) {
     C.N(C_1, C_2, C_e, row["nu"], pi_e, rho_1, row["N"], quantile=NULL)
@@ -306,7 +306,7 @@ CheckSet.D <- function(StartN,
     warning("The optimum was at the end of the range. Consider increasing NumCheck or re-running with the output as the new StartN.")
   }
   Checks <- Checks %>% dplyr::mutate(
-    SD=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
+    SE=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
     Ns.E=N*nu,
     M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
     M1.E=N*rho_1*pi_e*rho_2

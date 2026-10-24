@@ -1,6 +1,5 @@
 library(tidyverse)
-source("r/KeyFunctions.R")
-source("r/Optimize.R")
+source("r/BaseFunctions.R")
 
 ## As of M0 and M1:
 SimInt <- function(
@@ -193,9 +192,9 @@ SimMany <- function(NoSims,
                                               C_1, C_2, C_e,
                                               alpha=0.05,
                                               FailStart=0)))) %>%
-    dplyr::mutate(Diff=Est-theta,
-                  AbsDiff=abs(Est-theta),
-                  CI.Incl=(CIL <= theta & theta <= CIU),
+    dplyr::mutate(Bias=Est-theta,
+                  AbsBias=abs(Est-theta),
+                  CI.Cvg=(CIL <= theta & theta <= CIU),
                   Sig=(p < alpha))
 }
 
@@ -213,13 +212,13 @@ SimManyBin <- function(NoSims,
                                               C_1, C_2, C_e,
                                               alpha=0.05,
                                               FailStart=0)))) %>%
-    dplyr::mutate(RD.Diff=RD.Est-RD,
-                  RD.AbsDiff=abs(RD.Est-RD),
-                  RD.CI.Incl=(RD.CIL <= RD & RD <= RD.CIU),
+    dplyr::mutate(RD.Bias=RD.Est-RD,
+                  RD.AbsBias=abs(RD.Est-RD),
+                  RD.CI.Cvg=(RD.CIL <= RD & RD <= RD.CIU),
                   RD.Sig=(RD.p < alpha),
-                  OR.Diff=OR.Est-OR,
-                  OR.AbsDiff=abs(OR.Est-OR),
-                  OR.CI.Incl=(OR.CIL <= OR & OR <= OR.CIU),
+                  OR.Bias=OR.Est-OR,
+                  OR.AbsBias=abs(OR.Est-OR),
+                  OR.CI.Cvg=(OR.CIL <= OR & OR <= OR.CIU),
                   OR.Sig=(OR.p < alpha))
 }
 
@@ -295,8 +294,8 @@ SimManyComp <- function(NoSims,
                                                   C_1, C_2, C_e,
                                                   alpha,
                                                   FailStart=0)))) %>%
-    dplyr::mutate(Diff=Est-theta,
-                  AbsDiff=abs(Est-theta),
-                  CI.Incl=(CIL <= theta & theta <= CIU),
+    dplyr::mutate(Bias=Est-theta,
+                  AbsBias=abs(Est-theta),
+                  CI.Cvg=(CIL <= theta & theta <= CIU),
                   Sig=(p < alpha))
 }

@@ -1,5 +1,5 @@
 library(tidyverse)
-source("r/KeyFunctions.R")
+source("r/Simulate.R")
 
 ## Approach 1: Set Minimum Overall Power, then Minimize Expected Budget
 
@@ -42,7 +42,7 @@ OptimalBudget <- function(Delta,
     Opt <- tibble(N=Start["N"],
                   nu=Start["nu"]) %>%
       dplyr::mutate(Power=Delta.N(theta, s_0, s_1, nu, pi_e, rho_1, rho_2, N, alpha, restrict),
-                    SD=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
+                    SE=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
                     Cost.E=C.N(C_1, C_2, C_e, nu, pi_e, rho_1, N, quantile=NULL),
                     Ns.E=N*nu,
                     M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
@@ -101,7 +101,7 @@ OptimalPower <- function(B,
     Opt <- tibble(N=Start["N"],
                   nu=Start["nu"]) %>%
       dplyr::mutate(Power=Delta.N(theta, s_0, s_1, nu, pi_e, rho_1, rho_2, N, alpha, restrict),
-                    SD=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
+                    SE=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N, restrict)),
                     Cost.E=C.N(C_1, C_2, C_e, nu, pi_e, rho_1, N, quantile=NULL),
                     Ns.E=N*nu,
                     M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
@@ -118,5 +118,92 @@ OptimalPower <- function(B,
                       round)
   }
   return(Opt)
+}
+
+## Combined Computation and Simulation Design Analysis Functions:
+
+AnalyzeDesigns <- function(Designs,
+                           theta, s_0, s_1,
+                           pi_e, rho_1, rho_2,  
+                           C_1, C_2, C_e,
+                           alpha=0.05, restrict=5,
+                           NoSims=0) {
+  Res <- NULL
+  for (i in 1:nrow(Designs)) {
+    N <- Designs$N[i]
+    nu <- Designs$nu[i]
+    Res.i <- tibble(Power=Delta.N(theta, s_0, s_1,
+                                  nu, pi_e, rho_1, rho_2, N, alpha, restrict),
+                    SE=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N,
+                                restrict)),
+                    Cost.E=C.N(C_1, C_2, C_e, nu, pi_e, rho_1, N),
+                    Ns.E=N*nu,
+                    M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
+                    M1.E=N*rho_1*pi_e*rho_2)
+    if (NoSims > 0) {
+      names(Res.i) <- paste0("Comp.",names(Res.i))
+      Sims <- SimMany(NoSims,
+                      N, nu, theta,
+                      s_0, s_1,
+                      pi_e, rho_1, rho_2,
+                      C_1, C_2, C_e,
+                      alpha)
+      SimOut <- c(apply(Sims %>% 
+                        dplyr::select(Est, Bias, AbsBias, SE, 
+                                      CI.Cvg, Sig, Cost),
+                      2, mean),
+                  Est.SD=sd(Sims$Est))
+      names(SimOut) <- paste0("Sim.", names(SimOut))
+      Res.i <- Res.i %>% bind_cols(as_tibble_row(SimOut) %>%
+                                     dplyr::rename(Sim.Power=Sim.Sig))
+    }
+    Res <- Res %>% bind_rows(Res.i)
+  }
+  return(Designs %>% bind_cols(Res))
+}
+
+AnalyzeDesignsBin <- function(Designs,
+                           pi_0, pi_1,
+                           pi_e, rho_1, rho_2,  
+                           C_1, C_2, C_e,
+                           alpha=0.05, restrict=5,
+                           NoSims=0) {
+  Res <- NULL
+  theta <- abs(pi_1 - pi_0)
+  s_0 <- sqrt(pi_0*(1-pi_0))
+  s_1 <- sqrt(pi_1*(1-pi_1))
+  for (i in 1:nrow(Designs)) {
+    N <- Designs$N[i]
+    nu <- Designs$nu[i]
+    Res.i <- tibble(Power=Delta.N(theta, s_0, s_1,
+                                  nu, pi_e, rho_1, rho_2, N, alpha, restrict),
+                    SE=sqrt(V.N(s_0, s_1, nu, pi_e, rho_1, rho_2, N,
+                                restrict)),
+                    Cost.E=C.N(C_1, C_2, C_e, nu, pi_e, rho_1, N),
+                    Ns.E=N*nu,
+                    M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
+                    M1.E=N*rho_1*pi_e*rho_2)
+    if (NoSims > 0) {
+      names(Res.i) <- paste0("Comp.",names(Res.i))
+      Sims <- SimManyBin(NoSims,
+                         N, nu, 
+                         pi_0, pi_1,
+                         pi_e, rho_1, rho_2,
+                         C_1, C_2, C_e,
+                         alpha)
+      SimOut <- c(apply(Sims %>% 
+                          dplyr::select(ends_with(c("Est", "Bias", "AbsBias", "SE", 
+                                        "CI.Cvg", "Sig", "Cost"))),
+                        2, mean),
+                  RD.Est.SD=sd(Sims$RD.Est),
+                  OR.Est.SD=sd(Sims$OR.Est))
+      names(SimOut) <- paste0("Sim.", names(SimOut))
+      Res.i <- Res.i %>% bind_cols(as_tibble_row(SimOut) %>%
+                                     dplyr::rename(Sim.RD.Power=Sim.RD.Sig,
+                                                   Sim.OR.Power=Sim.OR.Sig))
+    }
+    Res <- Res %>% bind_rows(Res.i)
+  }
+  return(Designs %>% bind_cols(Res))
 }
 
