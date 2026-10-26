@@ -169,9 +169,11 @@ AnalyzeDesignsBin <- function(Designs,
                            alpha=0.05, restrict=5,
                            NoSims=0) {
   Res <- NULL
-  theta <- abs(pi_1 - pi_0)
-  s_0 <- sqrt(pi_0*(1-pi_0))
-  s_1 <- sqrt(pi_1*(1-pi_1))
+  
+  theta <- abs(log((pi_1/(1-pi_1))/(pi_0/(1-pi_0))))
+  s_0 <- sqrt(1/(pi_0*(1-pi_0))) ## Lachin, p. 27
+  s_1 <- sqrt(1/(pi_1*(1-pi_1)))
+  
   for (i in 1:nrow(Designs)) {
     N <- Designs$N[i]
     nu <- Designs$nu[i]
@@ -194,9 +196,9 @@ AnalyzeDesignsBin <- function(Designs,
       SimOut <- c(apply(Sims %>% 
                           dplyr::select(ends_with(c("Est", "Bias", "AbsBias", "SE", 
                                         "CI.Cvg", "Sig", "Cost"))),
-                        2, mean),
-                  RD.Est.SD=sd(Sims$RD.Est),
-                  OR.Est.SD=sd(Sims$OR.Est))
+                        2, mean, na.rm=TRUE),
+                  RD.Est.SD=sd(Sims$RD.Est, na.rm=TRUE),
+                  OR.Est.SD=sd(Sims$OR.Est, na.rm=TRUE))
       names(SimOut) <- paste0("Sim.", names(SimOut))
       Res.i <- Res.i %>% bind_cols(as_tibble_row(SimOut) %>%
                                      dplyr::rename(Sim.RD.Power=Sim.RD.Sig,

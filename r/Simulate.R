@@ -36,23 +36,71 @@ SimIntBin <- function(
   
   dat <- tibble(A=rep(c(0,1), times=c(M0,M1)),
                 Y=c(Y0,Y1))
-  lm <- lm(Y~A, data=dat)
-  ci <- confint(lm, parm="A", level=1-alpha)
+  
+  lm <- tryCatch({
+    glm(Y~A, family=binomial(link="identity"), data=dat)
+  }, error=NULL)
+  if (is.null(lm)) {
+    RD.Est <- NA_real_
+    RD.SE <- NA_real_
+    RD.p <- NA_real_
+    RD.CIL <- NA_real_
+    RD.CIU <- NA_real_
+  } else {
+    RD.Est <- unname(coef(lm)["A"])
+    RD.SE <- summary(lm)$coefficients["A","Std. Error"]
+    RD.p <- summary(lm)$coefficients["A","Pr(>|z|)"]
+    ci <- tryCatch({
+      suppressMessages(confint(lm, parm="A", level=1-alpha))
+    }, error=NULL)
+    if (is.null(ci)) {
+      RD.CIL <- NULL
+      RD.CIU <- NULL
+    } else {
+      RD.CIL <- unname(ci[1])
+      RD.CIU <- unname(ci[2])
+    }
+  }
+  
+  glm <- tryCatch({
+    glm(Y~A, family=binomial(link="logit"), data=dat)
+  }, error=NULL)
+  if (is.null(glm)) {
+    OR.Est <- NA_real_
+    LOR.SE <- NA_real_
+    OR.p <- NA_real_
+    OR.CIL <- NA_real_
+    OR.CIU <- NA_real_
+  } else {
+    OR.Est <- exp(unname(coef(glm)["A"]))
+    LOR.SE <- summary(glm)$coefficients["A","Std. Error"]
+    OR.p <- summary(glm)$coefficients["A","Pr(>|z|)"]
+    gci <- tryCatch({
+      suppressMessages(confint(glm, parm="A", level=1-alpha))
+    }, error=NULL)
+    if (is.null(gci)) {
+      OR.CIL <- NULL
+      OR.CIU <- NULL
+    } else {
+      OR.CIL <- unname(gci[1])
+      OR.CIU <- unname(gci[2])
+    }
+  }
   
   glm <- glm(Y~A, family=binomial, data=dat)
   gci <- suppressMessages(exp(confint(glm, parm="A", level=1-alpha)))
   return(c(Y0bar=mean(Y0), Y1bar=mean(Y1),
            Y0sd=sd(Y0), Y1sd=sd(Y1),
-           RD.Est=unname(coef(lm)["A"]),
-           RD.SE=summary(lm)$coefficients["A","Std. Error"],
-           RD.p=summary(lm)$coefficients["A","Pr(>|t|)"],
-           RD.CIL=ci[1],
-           RD.CIU=ci[2],
-           OR.Est=exp(unname(coef(glm)["A"])),
-           LOR.SE=summary(glm)$coefficients["A","Std. Error"],
-           OR.p=summary(glm)$coefficients["A","Pr(>|z|)"],
-           OR.CIL=unname(gci[1]),
-           OR.CIU=unname(gci[2])))
+           RD.Est=RD.Est,
+           RD.SE=RD.SE,
+           RD.p=RD.p,
+           RD.CIL=RD.CIL,
+           RD.CIU=RD.CIU,
+           OR.Est=OR.Est,
+           LOR.SE=LOR.SE,
+           OR.p=OR.p,
+           OR.CIL=OR.CIL,
+           OR.CIU=OR.CIU))
 }
 
 ## As of Beginning of Study:
