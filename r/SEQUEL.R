@@ -43,7 +43,7 @@ Designs.Aim1 <- AnalyzeDesigns(Designs.Aim1,
                                pi_e, rho_1, rho_2,  
                                C_1, C_2, C_e,
                                alpha=0.05, restrict=5,
-                               NoSims=2000)
+                               NoSims=2500)
 
 Designs.Aim1 %>% dplyr::select(ends_with(c("Design","N","nu","Cvg","Power")))  
 
@@ -74,7 +74,7 @@ Designs.Aim2 <- AnalyzeDesignsBin(Designs.Aim2,
                                   pi_e, rho_1, rho_2,  
                                   C_1, C_2, C_e,
                                   alpha=0.05, restrict=5,
-                                  NoSims=2000)
+                                  NoSims=2500)
 
 Designs.Aim2 %>% dplyr::select(Design,N,nu,ends_with("Cvg"),ends_with("Power"))
 
@@ -92,13 +92,14 @@ for (i in 1:nrow(Designs.Aim2.Comp)) {
                              pi_e, rho_1, rho_2,  
                              C_1, C_2, C_e,
                              alpha=0.05, restrict=5,
-                             NoSims=2000)
+                             NoSims=2500)
   Res <- Res %>% bind_rows(AnRes)
 }
 
 Prevalences.Aim2 <- Res
 
-Prevalences.Aim2 %>% dplyr::select(OR,starts_with("pi"),ends_with("Power"))
+Prevalences.Aim2 %>% dplyr::select(OR, starts_with("pi"),
+                                   ends_with("Cvg"), ends_with("Power"))
 
 save(list=c("Designs.Aim1", "Designs.Aim2",
             "Prevalences.Aim2"),

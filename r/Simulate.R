@@ -38,7 +38,7 @@ SimIntBin <- function(
                 Y=c(Y0,Y1))
   
   lm <- tryCatch({
-    glm(Y~A, family=binomial(link="identity"), data=dat)
+    suppressWarnings(glm(Y~A, family=binomial(link="identity"), data=dat))
   }, error=NULL)
   if (is.null(lm)) {
     RD.Est <- NA_real_
@@ -51,7 +51,7 @@ SimIntBin <- function(
     RD.SE <- summary(lm)$coefficients["A","Std. Error"]
     RD.p <- summary(lm)$coefficients["A","Pr(>|z|)"]
     ci <- tryCatch({
-      suppressMessages(confint(lm, parm="A", level=1-alpha))
+      suppressWarnings(suppressMessages(confint(lm, parm="A", level=1-alpha)))
     }, error=NULL)
     if (is.null(ci)) {
       RD.CIL <- NULL
@@ -82,8 +82,8 @@ SimIntBin <- function(
       OR.CIL <- NULL
       OR.CIU <- NULL
     } else {
-      OR.CIL <- unname(gci[1])
-      OR.CIU <- unname(gci[2])
+      OR.CIL <- exp(unname(gci[1]))
+      OR.CIU <- exp(unname(gci[2]))
     }
   }
   
