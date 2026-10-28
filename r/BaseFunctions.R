@@ -313,3 +313,118 @@ CheckSet.D <- function(StartN,
   )
   return(Checks %>% dplyr::select(!ends_with(".E"),ends_with(".E")))
 }
+
+## Prospective Cohort Comparison:
+N.Comp <- function(theta, s_0, s_1, 
+                   pi_e, rho_1, rho_2, 
+                   Delta,
+                   alpha=0.05, restrict=NULL) {
+  V.req <- DeltaToV(theta,Delta,alpha)
+  return(1/V.req*(s_0^2/(rho_1*rho_2*(1-pi_e))+s_1^2/(rho_1*rho_2*pi_e)))
+}
+
+B.Comp <- function(B,
+                   theta, s_0, s_1,
+                   pi_e, rho_1, rho_2,
+                   C_1, C_2, C_e,
+                   alpha=0.05,
+                   restrict=5) {
+  N.set <- floor(B/(C_1+rho_1*C_2+rho_1*pi_e*C_e))
+  Delta <- Delta.N(theta, s_0, s_1,
+                   nu=1,
+                   pi_e, rho_1, rho_2, N.set, alpha, restrict)
+  
+  return(tibble(N=N.set, nu=1,
+                Power=Delta) %>% 
+           dplyr::mutate(SE=sqrt(V.N(s_0, s_1, nu=1, pi_e, rho_1, rho_2, N.set, restrict)),
+                         Cost.E=C.N(C_1, C_2, C_e, nu=1, pi_e, rho_1, N=N.set),
+                         Ns.E=N.set,
+                         M0.E=N.set*rho_1*(1-pi_e)*rho_2,
+                         M1.E=N.set*rho_1*pi_e*rho_2))
+}
+
+CheckSet.D.Comp <- function(StartN,
+                            Delta,
+                            theta, s_0, s_1,
+                            pi_e, rho_1, rho_2,
+                            C_1, C_2, C_e,
+                            alpha=0.05,
+                            restrict=5,
+                            NumCheck=10,
+                            round=3) {
+  Num0 <- NULL
+  StartD <- Delta.N(theta, s_0, s_1, 
+                    nu=1,
+                    pi_e, rho_1, rho_2, StartN, alpha, restrict)
+  
+  if (StartD >= Delta) {
+    CheckD <- Delta.N(theta, s_0, s_1,
+                      nu=1,
+                      pi_e, rho_1, rho_2, StartN-NumCheck, alpha, restrict)
+    
+    while (CheckD >= Delta) {
+      Num0 <- NumCheck
+      NumCheck <- 2*NumCheck
+      message(paste0("Increasing Checks Needed: Trying NumCheck=",NumCheck))
+      CheckD <- Delta.N(theta, s_0, s_1,
+                        nu=1,
+                        pi_e, rho_1, rho_2, StartN-NumCheck, alpha, restrict)
+    }
+    
+    Checks <- tibble(N=StartN-(0:NumCheck),
+                     nu=1)
+    if (!is.null(Num0)) {
+      Checks <- Checks %>% 
+        dplyr::filter(N < StartN-Num0)
+    }
+  } else {
+    CheckD <- Delta.N(theta, s_0, s_1,
+                      nu=1,
+                      pi_e, rho_1, rho_2, StartN+NumCheck, alpha, restrict)
+    
+    while (CheckD < Delta) {
+      Num0 <- NumCheck
+      NumCheck <- 2*NumCheck
+      message(paste0("Increasing Checks Needed: Trying NumCheck=",NumCheck))
+      CheckD <- Delta.N(theta, s_0, s_1,
+                        nu=1,
+                        pi_e, rho_1, rho_2, StartN+NumCheck, alpha, restrict)
+    }
+    Checks <- tibble(N=StartN+(0:NumCheck),
+                     nu=1)
+    if (!is.null(Num0)) {
+      Checks <- Checks %>% 
+        dplyr::filter(N > StartN+Num0)
+    }
+  }
+  
+  # print("Starting Power Calcs")
+  Checks$Power <- apply(Checks, 1, function(row) {
+    Delta.N(theta, s_0, s_1, row["nu"], pi_e, rho_1, rho_2,
+            row["N"], alpha, restrict)
+  })
+  # print("Finished Power Calcs")
+  Checks <- Checks %>% dplyr::filter(Power >= Delta)
+  Checks$Cost.E <- apply(Checks, 1, function(row) {
+    C.N(C_1, C_2, C_e, row["nu"], pi_e, rho_1, row["N"], quantile=NULL)
+  })
+  Checks <- Checks %>% dplyr::filter(Cost.E==min(Checks$Cost.E))
+  
+  if (nrow(Checks) > 1) {
+    Checks <- Checks %>% dplyr::filter(Power==max(Power))
+  }
+  if (Checks$N==StartN-NumCheck | Checks$N==StartN+NumCheck) {
+    warning("The optimum was at the end of the range. Consider increasing NumCheck or re-running with the output as the new StartN.")
+  }
+  Checks <- Checks %>% dplyr::mutate(
+    SE=sqrt(V.N(s_0, s_1, nu=1, pi_e, rho_1, rho_2, N, restrict)),
+    Ns.E=N,
+    M0.E=Ns.E*rho_1*(1-pi_e)*rho_2,
+    M1.E=N*rho_1*pi_e*rho_2
+  )
+  return(Checks %>% dplyr::select(!ends_with(".E"),ends_with(".E")))
+}
+  
+  
+
+

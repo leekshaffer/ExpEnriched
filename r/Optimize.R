@@ -194,9 +194,12 @@ AnalyzeDesignsBin <- function(Designs,
                          C_1, C_2, C_e,
                          alpha)
       SimOut <- c(apply(Sims %>% 
-                          dplyr::select(ends_with(c("Est", "Bias", "AbsBias", "SE", 
-                                        "CI.Cvg", "Sig", "Cost"))),
+                          dplyr::select(ends_with(c("Est", "Bias", "AbsBias", "SE",
+                                                    "Cost"))),
                         2, mean, na.rm=TRUE),
+                  apply(Sims %>% 
+                          dplyr::select(ends_with(c("CI.Cvg", "Sig"))),
+                        2, function(x) sum(x, na.rm=TRUE)/length(x)),
                   RD.Est.SD=sd(Sims$RD.Est, na.rm=TRUE),
                   OR.Est.SD=sd(Sims$OR.Est, na.rm=TRUE))
       names(SimOut) <- paste0("Sim.", names(SimOut))

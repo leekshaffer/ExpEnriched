@@ -1,5 +1,4 @@
-source("R/Simulate.R")
-source("R/Optimize.R")
+source("r/Optimize.R")
 options(scipen=8)
 options(warn=1)
 set.seed(20261023)
@@ -22,8 +21,9 @@ rho_2 <- 0.96
 s_0 <- 1
 s_1 <- 1
 theta <- 0.4
+Delta <- 0.9
 
-Design.1 <- OptimalBudget(Delta=0.9,
+Design.1 <- OptimalBudget(Delta,
               theta, s_0, s_1,
               pi_e, rho_1, rho_2,
               C_1, C_2, C_e,
@@ -138,7 +138,56 @@ for (i in 1:nrow(ORs.Aim2)) {
 Scenarios.Aim2 %>% dplyr::select(OR, starts_with("pi"),
                                  ends_with("Cvg"), ends_with("Power"))
 
+## Comparison to Standard Prospective Cohort:
+
+Ns.Aim1.Comp <- tibble(Comparison=c("N", "Budget", "Power"),
+                       N=c(Designs.Aim1 %>% dplyr::filter(Design==3) %>% pull(N),
+                           B.Comp(Designs.Aim1 %>% dplyr::filter(Design==3) %>% pull(Comp.Cost.E),
+                                  theta, s_0, s_1, pi_e, rho_1, rho_2, C_1, C_2, C_e) %>% pull(N),
+                           CheckSet.D.Comp(floor(N.Comp(theta, s_0, s_1, pi_e, rho_1, rho_2, Delta, alpha, restrict=3)),
+                                           Delta, theta, s_0, s_1, pi_e, rho_1, rho_2, C_1, C_2, C_e) %>%
+                             pull(N)),
+                       nu=1)
+
+Comps.Aim1 <- NULL
+for (i in 1:nrow(Ns.Aim1.Comp)) {
+  Comps.Aim1 <- bind_rows(Comps.Aim1,
+                          AnalyzeDesigns(Ns.Aim1.Comp[i,],
+                                         theta, s_0, s_1,
+                                         pi_e, rho_1, rho_2,  
+                                         C_1, C_2, C_e,
+                                         alpha=0.05, restrict=5,
+                                         NoSims=2500))
+}
+
+Comps.Aim1 %>% dplyr::select(Comparison, N, 
+                             contains("Cost"), ends_with("Cvg"), ends_with("Power"))
+
+Ns.Aim2.Comp <- tibble(Comparison=c("N", "Budget", "Power"),
+                       N=c(Designs.Aim2 %>% dplyr::filter(Design==3) %>% pull(N),
+                           B.Comp(Designs.Aim2 %>% dplyr::filter(Design==3) %>% pull(Comp.Cost.E),
+                                  theta.bin, s_0.bin, s_1.bin, pi_e, rho_1, rho_2, C_1, C_2, C_e) %>% pull(N),
+                           CheckSet.D.Comp(floor(N.Comp(theta.bin, s_0.bin, s_1.bin, pi_e, rho_1, rho_2, Delta.bin, alpha, restrict=3)),
+                                           Delta.bin, theta.bin, s_0.bin, s_1.bin, pi_e, rho_1, rho_2, C_1, C_2, C_e) %>%
+                             pull(N)),
+                       nu=1)
+
+Comps.Aim2 <- NULL
+for (i in 1:nrow(Ns.Aim2.Comp)) {
+  Comps.Aim2 <- bind_rows(Comps.Aim2,
+                          AnalyzeDesignsBin(Ns.Aim2.Comp[i,],
+                                            pi_0, pi_1,
+                                            pi_e, rho_1, rho_2,  
+                                            C_1, C_2, C_e,
+                                            alpha=0.05, restrict=5,
+                                            NoSims=2500))
+}
+
+Comps.Aim2 %>% dplyr::select(Comparison, N, 
+                             contains("Cost"), ends_with("Cvg"), ends_with("Power"))
+
 save(list=c("Designs.Aim1", "Designs.Aim2",
-            "Scenarios.Aim1", "Scenarios.Aim2"),
+            "Scenarios.Aim1", "Scenarios.Aim2",
+            "Comps.Aim1", "Comps.Aim2"),
      file="out/Design_Results.Rda")
 

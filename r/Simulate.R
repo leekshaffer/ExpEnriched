@@ -39,7 +39,11 @@ SimIntBin <- function(
   
   lm <- tryCatch({
     suppressWarnings(glm(Y~A, family=binomial(link="identity"), data=dat))
-  }, error=NULL)
+  }, error=function (e) {
+    message("Error in One Simulation Identity GLM. Returning NA for that simulation.")
+    NULL
+  })
+  
   if (is.null(lm)) {
     RD.Est <- NA_real_
     RD.SE <- NA_real_
@@ -52,10 +56,13 @@ SimIntBin <- function(
     RD.p <- summary(lm)$coefficients["A","Pr(>|z|)"]
     ci <- tryCatch({
       suppressWarnings(suppressMessages(confint(lm, parm="A", level=1-alpha)))
-    }, error=NULL)
+    }, error=function(e) {
+      message("Error in One Simulation Identity GLM CI. Returning NA for that simulation.")
+      NULL
+    })
     if (is.null(ci)) {
-      RD.CIL <- NULL
-      RD.CIU <- NULL
+      RD.CIL <- NA_real_
+      RD.CIU <- NA_real_
     } else {
       RD.CIL <- unname(ci[1])
       RD.CIU <- unname(ci[2])
@@ -63,8 +70,13 @@ SimIntBin <- function(
   }
   
   glm <- tryCatch({
-    glm(Y~A, family=binomial(link="logit"), data=dat)
-  }, error=NULL)
+    suppressWarnings(glm(Y~A, family=binomial(link="logit"), data=dat))
+  }, error=function(e) {
+    message("Error in One Simulation Logit GLM. Returning NA for that simulation.")
+    NULL
+    }
+  )
+  
   if (is.null(glm)) {
     OR.Est <- NA_real_
     LOR.SE <- NA_real_
@@ -76,19 +88,21 @@ SimIntBin <- function(
     LOR.SE <- summary(glm)$coefficients["A","Std. Error"]
     OR.p <- summary(glm)$coefficients["A","Pr(>|z|)"]
     gci <- tryCatch({
-      suppressMessages(confint(glm, parm="A", level=1-alpha))
-    }, error=NULL)
+      suppressWarnings(suppressMessages(confint(glm, parm="A", level=1-alpha)))
+    }, error=function(e) {
+      message("Error in One Simulation Logit GLM CI. Returning NA for that simulation.")
+      NULL
+      })
+    
     if (is.null(gci)) {
-      OR.CIL <- NULL
-      OR.CIU <- NULL
+      OR.CIL <- NA_real_
+      OR.CIU <- NA_real_
     } else {
       OR.CIL <- exp(unname(gci[1]))
       OR.CIU <- exp(unname(gci[2]))
     }
   }
   
-  glm <- glm(Y~A, family=binomial, data=dat)
-  gci <- suppressMessages(exp(confint(glm, parm="A", level=1-alpha)))
   return(c(Y0bar=mean(Y0), Y1bar=mean(Y1),
            Y0sd=sd(Y0), Y1sd=sd(Y1),
            RD.Est=RD.Est,
