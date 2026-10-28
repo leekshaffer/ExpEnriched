@@ -78,30 +78,67 @@ Designs.Aim2 <- AnalyzeDesignsBin(Designs.Aim2,
 
 Designs.Aim2 %>% dplyr::select(Design,N,nu,ends_with("Cvg"),ends_with("Power"))
 
-## Comparisons Across Different pi_0 Prevalences at Same OR:
+## Comparisons Across Different Scenarios:
 
+### Aim 1, different thetas:
+
+Designs.Aim1.Comp <- Designs.Aim1 %>% dplyr::filter(Design==3) %>%
+  dplyr::select(N,nu) %>%
+  cross_join(tibble(theta=c(seq(0.20, 0.50, by=0.02),0.25,0.35,0.45))) %>%
+  arrange(theta)
+
+Scenarios.Aim1 <- NULL
+for (i in 1:nrow(Designs.Aim1.Comp)) {
+  Scenarios.Aim1 <- bind_rows(Scenarios.Aim1,
+                              AnalyzeDesigns(Designs.Aim1.Comp[i,],
+                                             theta=Designs.Aim1.Comp$theta[i], s_0, s_1,
+                                             pi_e, rho_1, rho_2,  
+                                             C_1, C_2, C_e,
+                                             alpha=0.05, restrict=5,
+                                             NoSims=2500))
+}
+
+Scenarios.Aim1 %>% dplyr::select(theta,ends_with("Power"),ends_with("Cvg"))
+
+
+### Aim 2, different prevalences, fixed OR:
 Designs.Aim2.Comp <- cross_join(Designs.Aim2 %>% dplyr::filter(Design==3) %>%
                                   dplyr::select(N,nu),
                                 tibble(OR=2.15, pi_0=seq(0.05,0.35,by=0.05))) %>%
   dplyr::mutate(pi_1=(OR*(pi_0/(1-pi_0)))/(1+OR*(pi_0/(1-pi_0))))
-Res <- NULL
+Scenarios.Aim2 <- NULL
 for (i in 1:nrow(Designs.Aim2.Comp)) {
-  AnRes <- AnalyzeDesignsBin(Designs.Aim2.Comp[i,],
-                             Designs.Aim2.Comp[i,]$pi_0, 
-                             Designs.Aim2.Comp[i,]$pi_1,
-                             pi_e, rho_1, rho_2,  
-                             C_1, C_2, C_e,
-                             alpha=0.05, restrict=5,
-                             NoSims=2500)
-  Res <- Res %>% bind_rows(AnRes)
+  Scenarios.Aim2 <- bind_rows(Scenarios.Aim2,
+                              AnalyzeDesignsBin(Designs.Aim2.Comp[i,],
+                                                Designs.Aim2.Comp[i,]$pi_0, 
+                                                Designs.Aim2.Comp[i,]$pi_1,
+                                                pi_e, rho_1, rho_2,  
+                                                C_1, C_2, C_e,
+                                                alpha=0.05, restrict=5,
+                                                NoSims=2500))
 }
 
-Prevalences.Aim2 <- Res
+### Aim 2, different prevalences, fixed power:
+ORs.Aim2 <- Scenarios.Aim2 %>% dplyr::select(N,nu,pi_0) %>%
+  dplyr::mutate(OR=c(3.26,2.55,2.3,2.15,2.07,2.05,2),
+                pi_1=(pi_0/(1-pi_0))*OR/(1+(pi_0/(1-pi_0))*OR)) %>%
+  dplyr::select(N,nu,OR,pi_0,pi_1)
 
-Prevalences.Aim2 %>% dplyr::select(OR, starts_with("pi"),
-                                   ends_with("Cvg"), ends_with("Power"))
+for (i in 1:nrow(ORs.Aim2)) {
+  Scenarios.Aim2 <- bind_rows(Scenarios.Aim2,
+                              AnalyzeDesignsBin(ORs.Aim2[i,],
+                                                ORs.Aim2[i,]$pi_0, 
+                                                ORs.Aim2[i,]$pi_1,
+                                                pi_e, rho_1, rho_2,  
+                                                C_1, C_2, C_e,
+                                                alpha=0.05, restrict=5,
+                                                NoSims=2500))
+}
+
+Scenarios.Aim2 %>% dplyr::select(OR, starts_with("pi"),
+                                 ends_with("Cvg"), ends_with("Power"))
 
 save(list=c("Designs.Aim1", "Designs.Aim2",
-            "Prevalences.Aim2"),
+            "Scenarios.Aim1", "Scenarios.Aim2"),
      file="out/Design_Results.Rda")
 
