@@ -84,27 +84,31 @@ Designs.Aim2 %>% dplyr::select(Design,N,nu,ends_with("Cvg"),ends_with("Power"))
 
 Designs.Aim1.Comp <- Designs.Aim1 %>% dplyr::filter(Design==3) %>%
   dplyr::select(N,nu) %>%
-  cross_join(tibble(theta=c(seq(0.20, 0.50, by=0.02),0.25,0.35,0.45))) %>%
-  arrange(theta)
+  cross_join(tibble(theta=c(seq(0.20, 0.50, by=0.02),0.25,0.35,0.45)) %>%
+               cross_join(tibble(pi_e=seq(0.08,0.02,by=-0.01)))) %>%
+  arrange(desc(pi_e),theta)
 
 Scenarios.Aim1 <- NULL
 for (i in 1:nrow(Designs.Aim1.Comp)) {
   Scenarios.Aim1 <- bind_rows(Scenarios.Aim1,
                               AnalyzeDesigns(Designs.Aim1.Comp[i,],
                                              theta=Designs.Aim1.Comp$theta[i], s_0, s_1,
-                                             pi_e, rho_1, rho_2,  
+                                             pi_e=Designs.Aim1.Comp$pi_e[i], rho_1, rho_2,  
                                              C_1, C_2, C_e,
                                              alpha=0.05, restrict=5,
                                              NoSims=2500))
 }
 
-Scenarios.Aim1 %>% dplyr::select(theta,ends_with("Power"),ends_with("Cvg"))
+Scenarios.Aim1 %>% dplyr::select(theta,pi_e,ends_with("Power"),ends_with("Cvg"))
+
+## Aim 1, Different Incidences:
 
 
 ### Aim 2, different prevalences, fixed OR:
 Designs.Aim2.Comp <- cross_join(Designs.Aim2 %>% dplyr::filter(Design==3) %>%
                                   dplyr::select(N,nu),
-                                tibble(OR=2.15, pi_0=seq(0.05,0.35,by=0.05))) %>%
+                                tibble(OR=2.15, pi_0=seq(0.05,0.35,by=0.05),
+                                       pi_e=0.05)) %>%
   dplyr::mutate(pi_1=(OR*(pi_0/(1-pi_0)))/(1+OR*(pi_0/(1-pi_0))))
 Scenarios.Aim2 <- NULL
 for (i in 1:nrow(Designs.Aim2.Comp)) {
@@ -121,7 +125,8 @@ for (i in 1:nrow(Designs.Aim2.Comp)) {
 ### Aim 2, different prevalences, fixed power:
 ORs.Aim2 <- Scenarios.Aim2 %>% dplyr::select(N,nu,pi_0) %>%
   dplyr::mutate(OR=c(3.26,2.55,2.3,2.15,2.07,2.05,2),
-                pi_1=(pi_0/(1-pi_0))*OR/(1+(pi_0/(1-pi_0))*OR)) %>%
+                pi_1=(pi_0/(1-pi_0))*OR/(1+(pi_0/(1-pi_0))*OR),
+                pi_e = 0.05) %>%
   dplyr::select(N,nu,OR,pi_0,pi_1)
 
 for (i in 1:nrow(ORs.Aim2)) {
@@ -130,6 +135,25 @@ for (i in 1:nrow(ORs.Aim2)) {
                                                 ORs.Aim2[i,]$pi_0, 
                                                 ORs.Aim2[i,]$pi_1,
                                                 pi_e, rho_1, rho_2,  
+                                                C_1, C_2, C_e,
+                                                alpha=0.05, restrict=5,
+                                                NoSims=2500))
+}
+
+### Aim 2, different LRI incidences:
+Incs.Aim2 <- cross_join(Designs.Aim2 %>% 
+                          dplyr::filter(Design==3) %>%
+                          dplyr::select(N,nu),
+                        tibble(OR=2.15, pi_0=0.20, 
+                               pi_e=seq(0.08,0.02,by=-0.01))) %>%
+  dplyr::mutate(pi_1=(OR*(pi_0/(1-pi_0)))/(1+OR*(pi_0/(1-pi_0))))
+
+for (i in 1:nrow(Incs.Aim2)) {
+  Scenarios.Aim2 <- bind_rows(Scenarios.Aim2,
+                              AnalyzeDesignsBin(Incs.Aim2[i,],
+                                                Incs.Aim2[i,]$pi_0, 
+                                                Incs.Aim2[i,]$pi_1,
+                                                pi_e=Incs.Aim2[i,]$pi_e, rho_1, rho_2,  
                                                 C_1, C_2, C_e,
                                                 alpha=0.05, restrict=5,
                                                 NoSims=2500))
