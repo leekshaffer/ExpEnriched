@@ -212,3 +212,39 @@ AnalyzeDesignsBin <- function(Designs,
   return(Designs %>% bind_cols(Res))
 }
 
+AnalyzeDesignsPath <- function(Designs,
+                           theta, thetap, prev,
+                           s_0, s_1,
+                           pi_e, rho_1, rho_2,  
+                           C_1, C_2, C_e,
+                           alpha=0.05, 
+                           NoSims=500) {
+  Res <- NULL
+  for (i in 1:nrow(Designs)) {
+    N <- Designs$N[i]
+    nu <- Designs$nu[i]
+    if (NoSims > 0) {
+      Sims <- SimManyPath(NoSims,
+                      N, nu, theta, thetap,
+                      prev,
+                      s_0, s_1,
+                      pi_e, rho_1, rho_2,
+                      C_1, C_2, C_e,
+                      alpha)
+      SimOut <- c(apply(Sims %>% 
+                          dplyr::select(Est, Bias, AbsBias, SE, 
+                                        CI.Cvg, Sig, Cost),
+                        2, mean, na.rm=TRUE),
+                  Est.SD=sd(Sims$Est, na.rm=TRUE),
+                  Y0bar.SD=sd(Sims$Y0bar, na.rm=TRUE),
+                  Y1bar.SD=sd(Sims$Y1bar, na.rm=TRUE),
+                  Missing=sum(is.na(Sims$Est)))
+      names(SimOut) <- paste0("Sim.", names(SimOut))
+      Res.i <- as_tibble_row(SimOut) %>%
+        dplyr::rename(Sim.Power=Sim.Sig)
+    }
+    Res <- Res %>% bind_rows(Res.i)
+  }
+  return(Designs %>% bind_cols(Res))
+}
+

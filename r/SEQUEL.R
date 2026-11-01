@@ -17,7 +17,7 @@ C_e <- 175
 rho_1 <- 0.95
 rho_2 <- 0.96
 
-## Aim 1, Continuous Outcome:
+## Aim 1.1, Continuous Outcome:
 s_0 <- 1
 s_1 <- 1
 theta <- 0.4
@@ -47,7 +47,7 @@ Designs.Aim1 <- AnalyzeDesigns(Designs.Aim1,
 
 Designs.Aim1 %>% dplyr::select(ends_with(c("Design","N","nu","Cvg","Power")))  
 
-## Aim 2, Binary Outcome:
+## Aim 1.2, Binary Outcome:
 pi_0 <- 0.2
 pi_1 <- 0.35
 s_0.bin <- sqrt(1/(pi_0*(1-pi_0)))
@@ -80,7 +80,7 @@ Designs.Aim2 %>% dplyr::select(Design,N,nu,ends_with("Cvg"),ends_with("Power"))
 
 ## Comparisons Across Different Scenarios:
 
-### Aim 1, different thetas:
+### Aim 1.1, different thetas and incidences:
 
 Designs.Aim1.Comp <- Designs.Aim1 %>% dplyr::filter(Design==3) %>%
   dplyr::select(N,nu) %>%
@@ -101,10 +101,8 @@ for (i in 1:nrow(Designs.Aim1.Comp)) {
 
 Scenarios.Aim1 %>% dplyr::select(theta,pi_e,ends_with("Power"),ends_with("Cvg"))
 
-## Aim 1, Different Incidences:
 
-
-### Aim 2, different prevalences, fixed OR:
+### Aim 1.2, different prevalences, fixed OR:
 Designs.Aim2.Comp <- cross_join(Designs.Aim2 %>% dplyr::filter(Design==3) %>%
                                   dplyr::select(N,nu),
                                 tibble(OR=2.15, pi_0=seq(0.05,0.35,by=0.05),
@@ -210,8 +208,36 @@ for (i in 1:nrow(Ns.Aim2.Comp)) {
 Comps.Aim2 %>% dplyr::select(Comparison, N, 
                              contains("Cost"), ends_with("Cvg"), ends_with("Power"))
 
+
+## Aim 2, Pathogen Comparisons:
+
+Designs.P <- Designs.Aim1 %>% dplyr::filter(Design==3) %>%
+  dplyr::select(N,nu) %>%
+  cross_join(tibble(Prev=seq(0.05, 0.5, by=0.05)) %>%
+               cross_join(tibble(thetap=seq(0.3,0.85,by=0.05))))
+
+Scenarios.P <- NULL
+for (i in 1:nrow(Designs.P)) {
+  Scenarios.P <- bind_rows(Scenarios.P,
+                           AnalyzeDesignsPath(Designs.P[i,],
+                                    theta, thetap=Designs.P$thetap[i], 
+                                    prev=Designs.P$Prev[i],
+                                    s_0, s_1,
+                                    pi_e, rho_1, rho_2,  
+                                    C_1, C_2, C_e,
+                                    alpha=0.05, 
+                                    NoSims=2500))
+}
+
+Scenarios.P %>% dplyr::filter(Sim.Power > 0.75) %>%
+  dplyr::select(N, thetap, Prev,
+                ends_with("Power"), ends_with("SD"), ends_with("Missing"))
+Scenarios.P %>% group_by(Prev) %>%
+  dplyr::summarize(SE=mean(Sim.Est.SD)) %>%
+  dplyr::mutate(MOE=1.96*SE)
+
 save(list=c("Designs.Aim1", "Designs.Aim2",
             "Scenarios.Aim1", "Scenarios.Aim2",
+            "Scenarios.P",
             "Comps.Aim1", "Comps.Aim2"),
      file="out/Design_Results.Rda")
-

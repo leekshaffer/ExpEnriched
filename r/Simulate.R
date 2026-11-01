@@ -117,6 +117,55 @@ SimIntBin <- function(
            OR.CIU=OR.CIU))
 }
 
+### Pathogen-specific estimation:
+SimIntPath <- function(
+    prev,
+    M1,
+    theta, thetap,
+    s_1,
+    alpha=0.05) {
+  
+  M1p <- rbinom(n=M1, size=1, prob=prev)
+  Y <- rnorm(n=M1, 
+             mean=theta+if_else(M1p==1,thetap,0),
+             sd=s_1)
+  
+  if (sum(M1p) <= 0) {
+    return(c(Y0bar=mean(Y),
+             Y1bar=NA_real_,
+             Y0sd=sd(Y),
+             Y1sd=NA_real_,
+             Est=NA_real_,
+             SE=NA_real_,
+             p=NA_real_,
+             CIL=NA_real_,
+             CIU=NA_real_))
+  } else if (sum(M1p) >= M1) {
+    return(c(Y0bar=NA_real_,
+             Y1bar=mean(Y),
+             Y0sd=NA_real_,
+             Y1sd=sd(Y),
+             Est=NA_real_,
+             SE=NA_real_,
+             p=NA_real_,
+             CIL=NA_real_,
+             CIU=NA_real_))
+  } else {
+    dat <- tibble(Path=M1p, Y=Y)
+    lm <- lm(Y~Path, data=dat)
+    ci <- confint(lm, parm="Path", level=1-alpha)
+    return(c(Y0bar=mean(dat %>% filter(Path==0) %>% pull(Y)), 
+             Y1bar=mean(dat %>% filter(Path==1) %>% pull(Y)),
+             Y0sd=sd(dat %>% filter(Path==0) %>% pull(Y)), 
+             Y1sd=sd(dat %>% filter(Path==1) %>% pull(Y)),
+             Est=unname(coef(lm)["Path"]),
+             SE=summary(lm)$coefficients["Path","Std. Error"],
+             p=summary(lm)$coefficients["Path","Pr(>|t|)"],
+             CIL=ci[1],
+             CIU=ci[2]))
+  }
+}
+
 ## As of Beginning of Study:
 
 SimOne <- function(
@@ -242,6 +291,67 @@ SimOneBin <- function(
                   alpha)))
 }
 
+SimOnePath <- function(
+    N, nu, theta, thetap,
+    prev,
+    s_0, s_1,
+    pi_e, rho_1, rho_2,
+    C_1, C_2, C_e,
+    alpha=0.05,
+    FailStart=0) {
+  
+  Failures <- FailStart
+  
+  Ns <- rbinom(1, size=N, prob=nu)
+  NsE <- rbinom(1, size=Ns, prob=rho_1) ## The number of Ns still enrolled at exposure determination
+  
+  if (NsE <= 0) {
+    warning("Trial simulation resulted in impermissible Ns size at exposure")
+    Failures <- Failures+1
+    return(SimOne(N, nu,
+                  s_0, s_1,
+                  pi_e, rho_1, rho_2,
+                  C_1, C_2, C_e,
+                  alpha,
+                  FailStart=Failures))
+  }
+  
+  N0 <- rbinom(1, size=NsE, prob=1-pi_e)
+  N1 <- rbinom(1, size=N-Ns, prob=rho_1*pi_e)+(NsE-N0)
+  
+  if (N0 <= 0 | N1 <= 0) {
+    warning("Trial simulation resulted in impermissible N0 or N1 size")
+    Failures <- Failures+1
+    return(SimOne(N, nu,
+                  s_0, s_1,
+                  pi_e, rho_1, rho_2,
+                  C_1, C_2, C_e,
+                  alpha,
+                  FailStart=Failures))
+  }
+  
+  M0 <- rbinom(1, size=N0, prob=rho_2)
+  M1 <- rbinom(1, size=N1, prob=rho_2)
+  
+  if (M0 <= 0 | M1 <= 0) {
+    warning("Trial simulation resulted in impermissible M0 or M1 size")
+    Failures <- Failures+1
+    return(SimOne(N, nu,
+                  s_0, s_1,
+                  pi_e, rho_1, rho_2,
+                  C_1, C_2, C_e,
+                  alpha,
+                  FailStart=Failures))
+  }
+  
+  return(c(N0=N0, N1=N1, M0=M0, M1=M1,
+           Cost=C_1*N + C_2*(N0+N1) + C_e*N1,
+           SimIntPath(prev, M1,
+                  theta, thetap,
+                  s_1,
+                  alpha)))
+}
+
 SimMany <- function(NoSims,
                     N, nu, theta,
                     s_0, s_1,
@@ -359,5 +469,25 @@ SimManyComp <- function(NoSims,
     dplyr::mutate(Bias=Est-theta,
                   AbsBias=abs(Est-theta),
                   CI.Cvg=(CIL <= theta & theta <= CIU),
+                  Sig=(p < alpha))
+}
+
+SimManyPath <- function(NoSims,
+                    N, nu, theta, thetap,
+                    prev,
+                    s_0, s_1,
+                    pi_e, rho_1, rho_2,
+                    C_1, C_2, C_e,
+                    alpha=0.05) {
+  as_tibble(t(replicate(n=NoSims, expr=SimOnePath(N, nu, theta, thetap,
+                                                  prev,
+                                                  s_0, s_1,
+                                                  pi_e, rho_1, rho_2,
+                                                  C_1, C_2, C_e,
+                                                  alpha=0.05,
+                                                  FailStart=0)))) %>%
+    dplyr::mutate(Bias=Est-thetap,
+                  AbsBias=abs(Est-thetap),
+                  CI.Cvg=(CIL <= thetap & thetap <= CIU),
                   Sig=(p < alpha))
 }
