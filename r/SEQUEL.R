@@ -120,7 +120,7 @@ for (i in 1:nrow(Designs.Aim2.Comp)) {
                                                 NoSims=2500))
 }
 
-### Aim 2, different prevalences, fixed power:
+### Aim 1.2, different prevalences, fixed power:
 ORs.Aim2 <- Scenarios.Aim2 %>% dplyr::select(N,nu,pi_0) %>%
   dplyr::mutate(OR=c(3.26,2.55,2.3,2.15,2.07,2.05,2),
                 pi_1=(pi_0/(1-pi_0))*OR/(1+(pi_0/(1-pi_0))*OR),
@@ -138,7 +138,7 @@ for (i in 1:nrow(ORs.Aim2)) {
                                                 NoSims=2500))
 }
 
-### Aim 2, different LRI incidences:
+### Aim 1.2, different LRI incidences:
 Incs.Aim2 <- cross_join(Designs.Aim2 %>% 
                           dplyr::filter(Design==3) %>%
                           dplyr::select(N,nu),
