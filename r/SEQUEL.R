@@ -8,12 +8,12 @@ pi_e <- 0.05
 
 alpha <- 0.05
 
-## Rough Cost Numbers:
+## Approximate Cost Values:
 C_1 <- 40
 C_2 <- 75*3+30*2
 C_e <- 175
 
-## Rough LTFU Numbers:
+## Approximate Retention Rates:
 rho_1 <- 0.95
 rho_2 <- 0.96
 
